@@ -37,8 +37,34 @@ export function dockTile(page: Page, title: string): Locator {
  */
 export async function boot(page: Page, path = '/'): Promise<void> {
   await page.goto(path);
+  await throughClassicShell(page);
   await expect(page.getByTestId('boot-sequence')).toBeVisible();
   await page.getByTestId('boot-sequence').waitFor({ state: 'detached', timeout: 15_000 });
+}
+
+/**
+ * Drive the 1984 classic shell through its Software Update handoff.
+ *
+ * Since Phase 3 the classic shell is the front door on every visit, so every
+ * test that wants the colour OS has to come through here first. The three
+ * test ids below are a contract with the Classic Boot agent — see
+ * CONTRACT-PHASE3.md.
+ *
+ * No-ops if the classic shell isn't on screen, so this stays safe to call twice.
+ */
+export async function throughClassicShell(page: Page): Promise<void> {
+  const classic = page.getByTestId('classic-shell');
+  if ((await classic.count()) === 0) return;
+
+  // The update notification is on a timer, so wait for the action rather than
+  // assuming it is present the moment the shell mounts.
+  const accept = page.getByTestId('software-update-action');
+  await accept.waitFor({ state: 'visible', timeout: 20_000 });
+  await accept.click();
+
+  await page
+    .getByTestId('update-transition')
+    .waitFor({ state: 'detached', timeout: 20_000 });
 }
 
 /** Boot, then wait for the auto-opened Browser window to be on screen. */

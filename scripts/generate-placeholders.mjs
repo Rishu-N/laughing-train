@@ -246,25 +246,43 @@ const ICONS = {
 
 /* ────────────────────────────────────────────────────────── system (SVG) ── */
 
+/**
+ * Menu-bar mark. An ORIGINAL chunky-pixel monogram in a rounded tile.
+ *
+ * Deliberately NOT a rainbow-striped mark and NOT a bitten fruit: this project
+ * must not reproduce Apple's trademarks anywhere. Style-inspired only.
+ * The Phase 3 Brand agent replaces this with the finished "Rishu Inc" mark.
+ */
 const LOGO = svg(
-  // A rainbow-striped apple-ish mark — deliberately generic, swap for your own.
-  `<g stroke="none">` +
-    `<rect x="6" y="4"  width="20" height="4" fill="#1f8a3c"/>` +
-    `<rect x="6" y="8"  width="20" height="4" fill="#e0a021"/>` +
-    `<rect x="6" y="12" width="20" height="4" fill="#e3690b"/>` +
-    `<rect x="6" y="16" width="20" height="4" fill="#c8202a"/>` +
-    `<rect x="6" y="20" width="20" height="4" fill="#7b3fb8"/>` +
-    `<rect x="6" y="24" width="20" height="4" fill="#2b3fd8"/>` +
-    `</g>` +
-    `<rect x="6" y="4" width="20" height="24" fill="none" stroke="#000" stroke-width="1"/>`,
+  `<rect x="5" y="4" width="22" height="24" rx="3" fill="#2b3fd8" stroke="#000" stroke-width="1"/>` +
+    // A blocky "R", drawn as pixels rather than a font so it stays crisp at 16px.
+    `<g fill="#ffffff">` +
+    `<rect x="10" y="9"  width="3" height="14"/>` +
+    `<rect x="13" y="9"  width="6" height="3"/>` +
+    `<rect x="19" y="10" width="3" height="5"/>` +
+    `<rect x="13" y="14" width="6" height="3"/>` +
+    `<rect x="16" y="17" width="3" height="3"/>` +
+    `<rect x="19" y="20" width="3" height="3"/>` +
+    `</g>`,
 );
 
-const HAPPY_MAC = svg(
-  `<rect x="4" y="3" width="24" height="24" rx="2" fill="#dcdcdc" stroke="#000"/>` +
-    `<rect x="7" y="6" width="18" height="14" fill="#ffffff" stroke="#000"/>` +
-    `<circle cx="12" cy="11" r="1.4" fill="#000"/><circle cx="20" cy="11" r="1.4" fill="#000"/>` +
-    `<path d="M11 15 q5 4 10 0" fill="none" stroke="#000" stroke-width="1.4"/>` +
-    `<rect x="9" y="22" width="14" height="2" fill="#8f8f8f"/>`,
+/**
+ * Colour-OS boot mark. An ORIGINAL 1-bit floppy disk — evokes the era without
+ * touching the Happy Mac smiling-computer icon, which is an Apple trademark and
+ * must not appear in this project.
+ */
+const BOOT_MARK = svg(
+  `<rect x="4" y="4" width="24" height="24" rx="1" fill="#dcdcdc" stroke="#000" stroke-width="1"/>` +
+    // Shutter.
+    `<rect x="11" y="5" width="10" height="10" fill="#ffffff" stroke="#000" stroke-width="1"/>` +
+    `<rect x="16" y="6" width="4" height="8" fill="#8f8f8f"/>` +
+    // Label.
+    `<rect x="8" y="18" width="16" height="9" fill="#ffffff" stroke="#000" stroke-width="1"/>` +
+    `<g fill="#8f8f8f">` +
+    `<rect x="10" y="20" width="12" height="1"/>` +
+    `<rect x="10" y="22" width="12" height="1"/>` +
+    `<rect x="10" y="24" width="8"  height="1"/>` +
+    `</g>`,
 );
 
 // Desktop pattern: the classic 50% dither, as a 4x4 tile.
@@ -278,7 +296,7 @@ for (const [name, content] of Object.entries(ICONS)) {
   write(`icons/${name}`, Buffer.from(content, 'utf8'));
 }
 write('desktop/logo.svg', Buffer.from(LOGO, 'utf8'));
-write('desktop/happy-mac.svg', Buffer.from(HAPPY_MAC, 'utf8'));
+write('desktop/boot-mark.svg', Buffer.from(BOOT_MARK, 'utf8'));
 write('desktop/pattern.svg', Buffer.from(PATTERN, 'utf8'));
 
 buildPortrait();

@@ -14,6 +14,7 @@ import { bio } from '@/content/bio';
 import { SYSTEM_IMAGES } from '@/content/images';
 import { LAYERS, MENUBAR_HEIGHT } from '@/lib/os/layers';
 import { DEFAULT_APP_ID, allApps, getApp } from '@/lib/os/registry';
+import { useStageStore } from '@/lib/os/stageStore';
 import { useWindowStore } from '@/lib/os/windowStore';
 import type { AppCategory } from '@/lib/os/types';
 import { MenuHeading, MenuItem, MenuList, MenuSeparator } from './ui';
@@ -40,6 +41,7 @@ export default function MenuBar() {
 
   const openApp = useWindowStore((s) => s.openApp);
   const closeAll = useWindowStore((s) => s.closeAll);
+  const restart = useStageStore((s) => s.restart);
   const runningAppIds = useWindowStore((s) => s.windows.map((w) => w.appId).join(','));
 
   /* ── clock ─────────────────────────────────────────────────────────────── */
@@ -294,6 +296,18 @@ export default function MenuBar() {
                   </MenuItem>
                 </>
               )}
+
+              {/* Drops back to the 1984 classic shell, so the desk accessories
+                  stay re-explorable instead of being a one-time cutscene. */}
+              <MenuSeparator />
+              <MenuItem
+                onSelect={() => {
+                  close();
+                  restart();
+                }}
+              >
+                Restart…
+              </MenuItem>
             </MenuList>
           </div>
         )}

@@ -16,10 +16,28 @@
 export const SYSTEM_IMAGES = {
   /** Menu-bar logo, top right. Click target for the About/socials dropdown. */
   logo: '/images/desktop/logo.svg',
-  /** Shown during the boot sequence. */
-  happyMac: '/images/desktop/happy-mac.svg',
+  /** Shown during the colour OS boot sequence. */
+  bootMark: '/images/desktop/boot-mark.svg',
   /** Tiled behind the whole desktop. */
   desktopPattern: '/images/desktop/pattern.svg',
+} as const;
+
+/* ---------------------------------------------------------------- brand ---- */
+
+/**
+ * Phase 3 brand marks for the classic shell and the Software Update handoff.
+ *
+ * These must be ORIGINAL designs. Do not reproduce Apple's bitten-apple logo,
+ * the Happy Mac smiling-computer icon, or any other Apple trademark or artwork
+ * anywhere in this project — style-inspired only.
+ */
+export const BRAND_IMAGES = {
+  /** 1-bit mark shown on the 1984 classic boot screen. Original shape. */
+  classicMark: '/images/brand/classic-mark.svg',
+  /** "Rishu Inc" wordmark that animates in after the software update. */
+  rishuInc: '/images/brand/rishu-inc.svg',
+  /** 32x32, pure 1-bit black & white bitmap portrait for the classic shell. */
+  classicPortrait: '/images/brand/classic-portrait.png',
 } as const;
 
 /* ------------------------------------------------------------ app icons ---- */

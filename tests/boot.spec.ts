@@ -5,14 +5,31 @@
  * Browser is already open, showing the bio. Everything else is decoration.
  */
 import { expect, test } from '@playwright/test';
-import { bootToDesktop, dockTile, windowByTitle, windows } from './helpers';
+import {
+  bootToDesktop,
+  dockTile,
+  throughClassicShell,
+  windowByTitle,
+  windows,
+} from './helpers';
 
 test('boot overlay appears and then clears', async ({ page }) => {
   await page.goto('/');
+  await throughClassicShell(page);
   await expect(page.getByTestId('boot-sequence')).toBeVisible();
-  await expect(page.getByAltText('Happy Mac')).toBeVisible();
   await page.getByTestId('boot-sequence').waitFor({ state: 'detached', timeout: 15_000 });
   await expect(page.getByTestId('boot-sequence')).toHaveCount(0);
+});
+
+test('the classic shell is the front door and hands off to the colour OS', async ({
+  page,
+}) => {
+  await page.goto('/');
+  // Every visit starts in 1984 — no skip, by design.
+  await expect(page.getByTestId('classic-shell')).toBeVisible();
+  await throughClassicShell(page);
+  await expect(page.getByTestId('classic-shell')).toHaveCount(0);
+  await expect(windowByTitle(page, /^Browser/)).toBeVisible();
 });
 
 test('the Browser window is open by default after boot', async ({ page }) => {

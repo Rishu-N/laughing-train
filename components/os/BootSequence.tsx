@@ -65,15 +65,15 @@ export default function BootSequence({ onDone }: { onDone: () => void }) {
           className="fixed inset-0 flex flex-col items-center justify-center bg-os-face motion-reduce:hidden"
           style={{ zIndex: LAYERS.boot }}
         >
-          {/* Happy Mac — pops in on the CRT warming up. */}
+          {/* Boot mark — pops in as the CRT warms up. */}
           <motion.div
             initial={{ scale: 0.55, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.35, ease: [0.34, 1.4, 0.64, 1] }}
           >
             <Image
-              src={SYSTEM_IMAGES.happyMac}
-              alt="Happy Mac"
+              src={SYSTEM_IMAGES.bootMark}
+              alt=""
               width={96}
               height={96}
               className="pixelated"
