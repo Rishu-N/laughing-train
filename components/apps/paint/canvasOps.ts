@@ -182,7 +182,7 @@ export function drawPortrait(
   url: string,
   width: number,
   height: number,
-  coverage = 0.7,
+  coverage = 0.85,
 ): Promise<void> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -190,7 +190,9 @@ export function drawPortrait(
       const maxW = width * coverage;
       const maxH = height * coverage;
       const raw = Math.min(maxW / img.width, maxH / img.height);
-      const scale = raw >= 1 ? Math.max(1, Math.floor(raw)) : raw;
+      // Whole-number scales (or whole-number reciprocals) keep pixel art crisp;
+      // an arbitrary factor like 0.875 shimmers even with smoothing disabled.
+      const scale = raw >= 1 ? Math.floor(raw) : 1 / Math.ceil(1 / raw);
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
       ctx.imageSmoothingEnabled = false;

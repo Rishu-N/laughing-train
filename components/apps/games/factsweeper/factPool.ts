@@ -81,7 +81,10 @@ export function drawFacts(
   }
 
   if (draws.length < count) {
-    const known = shuffle(pool.filter((f) => recovered.has(f.id)));
+    // Every fact at this rarity is now on file — either recovered earlier or
+    // pulled a moment ago in this same batch — so the remaining sectors surface
+    // duplicates. They read as "DUPLICATE" and move no counters.
+    const known = shuffle(pool);
     let i = 0;
     while (draws.length < count && known.length > 0) {
       draws.push({ factId: known[i % known.length].id, repeat: true });

@@ -47,6 +47,8 @@ interface Selection {
 
 interface Editing extends Selection {
   value: string;
+  /** Which input owns the caret. Rendering both at once would fight over focus. */
+  source: 'cell' | 'bar';
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -77,9 +79,12 @@ export default function SpreadsheetApp({ setTitle }: AppWindowProps) {
     selectedRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [sel]);
 
+  // Only re-focus when the edited cell changes, not on every keystroke.
+  const cellEditKey =
+    editing && editing.source === 'cell' ? `${editing.col}:${editing.row}` : null;
   useEffect(() => {
-    if (editing) cellInputRef.current?.focus();
-  }, [editing]);
+    if (cellEditKey) cellInputRef.current?.focus();
+  }, [cellEditKey]);
 
   const setCell = useCallback(
     (id: string, raw: string) => {
@@ -111,7 +116,7 @@ export default function SpreadsheetApp({ setTitle }: AppWindowProps) {
   );
 
   const beginEdit = useCallback((target: Selection, initial: string) => {
-    setEditing({ ...target, value: initial });
+    setEditing({ ...target, value: initial, source: 'cell' });
   }, []);
 
   /* --------------------------------------------------------- grid keys --- */
@@ -232,7 +237,7 @@ export default function SpreadsheetApp({ setTitle }: AppWindowProps) {
               className="min-w-0 flex-1"
               aria-label={`Contents of ${selId}`}
               value={editing ? editing.value : selRaw}
-              onChange={(e) => setEditing({ ...sel, value: e.target.value })}
+              onChange={(e) => setEditing({ ...sel, value: e.target.value, source: 'bar' })}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -299,28 +304,35 @@ export default function SpreadsheetApp({ setTitle }: AppWindowProps) {
                 const id = cellId(c, r);
                 const value = sheet.valueOf(id);
                 const isSelected = sel.col === c && sel.row === r;
-                const isEditing = !!editing && editing.col === c && editing.row === r;
+                const isEditing =
+                  !!editing && editing.source === 'cell' && editing.col === c && editing.row === r;
                 return (
                   <div
                     key={c}
                     ref={isSelected ? selectedRef : undefined}
-                    style={{ width: COL_WIDTH, height: ROW_HEIGHT }}
                     onPointerDown={() => {
                       if (editing && !isEditing) commitEdit(0, 0);
                       setSel({ col: c, row: r });
                       gridRef.current?.focus();
                     }}
                     onDoubleClick={() => beginEdit({ col: c, row: r }, cells[id] ?? '')}
-                    className={`relative shrink-0 overflow-hidden border-r border-b border-os-chrome-dark bg-os-face ${
-                      isSelected ? 'outline-2 -outline-offset-2 outline-os-accent' : ''
-                    }`}
+                    style={{
+                      width: COL_WIDTH,
+                      height: ROW_HEIGHT,
+                      outline: isSelected ? '2px solid var(--color-os-accent)' : undefined,
+                      outlineOffset: '-2px',
+                    }}
+                    className="relative shrink-0 overflow-hidden border-r border-b border-os-chrome-dark bg-os-face"
+
                   >
                     {isEditing ? (
                       <input
                         ref={cellInputRef}
                         value={editing.value}
                         aria-label={`Edit ${id}`}
-                        onChange={(e) => setEditing({ col: c, row: r, value: e.target.value })}
+                        onChange={(e) =>
+                          setEditing({ col: c, row: r, value: e.target.value, source: 'cell' })
+                        }
                         onKeyDown={onEditKeyDown}
                         onBlur={() => commitEdit(0, 0)}
                         className="absolute inset-0 h-full w-full bg-os-face px-1 font-[family-name:var(--font-os-body)] text-[11px] outline-none"

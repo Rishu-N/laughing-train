@@ -17,7 +17,6 @@ import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   RARITY_LABELS,
-  getFact,
   lockedCount,
   poolFor,
 } from './factPool';

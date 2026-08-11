@@ -24,6 +24,7 @@ import {
   ToolbarSpacer,
 } from '@/components/os/ui';
 import { useAppSession } from '@/lib/os/persist';
+import type { AppWindowProps } from '@/lib/os/types';
 import { SELF_PORTRAIT } from '@/content/images';
 import {
   drawImageUrl,
@@ -93,21 +94,24 @@ interface Gesture {
 
 const EMPTY_SESSION: PaintSession = { dataUrl: null };
 
-export default function PaintApp() {
+export default function PaintApp({ setTitle }: AppWindowProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const undoRef = useRef<string[]>([]);
   const restoredRef = useRef(false);
+  const textFieldRef = useRef<HTMLDivElement | null>(null);
 
   const [session, setSession, resetSession, hydrated] = useAppSession<PaintSession>(
     'paint',
     EMPTY_SESSION,
   );
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
-
-  const [palette, setPalette] = useState<ResolvedSwatch[]>([]);
+  // The palette reads CSS custom properties, so it can only be built in the
+  // browser. This component is loaded with ssr:false, so the lazy initialiser
+  // runs client-side; the guard is belt and braces.
+  const [palette] = useState<ResolvedSwatch[]>(() =>
+    typeof window === 'undefined' ? [] : resolvePalette(),
+  );
   const [tool, setTool] = useState<ToolId>('pencil');
   const [brush, setBrush] = useState(2);
   const [swatchIndex, setSwatchIndex] = useState(0);
@@ -129,8 +133,8 @@ export default function PaintApp() {
   /* ------------------------------------------------------------ palette --- */
 
   useEffect(() => {
-    setPalette(resolvePalette());
-  }, []);
+    setTitle('Untitled');
+  }, [setTitle]);
 
   /* --------------------------------------------------------- fit to box --- */
 
@@ -168,14 +172,15 @@ export default function PaintApp() {
     if (!c) return;
     c.fillStyle = TILE_BACKGROUND;
     c.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    const stored = sessionRef.current.dataUrl;
-    if (stored) {
-      void drawImageUrl(c, stored, CANVAS_W, CANVAS_H);
+    if (session.dataUrl) {
+      void drawImageUrl(c, session.dataUrl, CANVAS_W, CANVAS_H);
     } else {
       // First run: greet the visitor with the pixel self-portrait.
       void drawPortrait(c, SELF_PORTRAIT, CANVAS_W, CANVAS_H);
     }
-  }, [hydrated, ctx]);
+    // restoredRef makes this a once-only effect; session.dataUrl is in the deps
+    // only to satisfy the exhaustive-deps rule.
+  }, [hydrated, session.dataUrl, ctx]);
 
   /* ------------------------------------------------------------ storage --- */
 
@@ -417,6 +422,16 @@ export default function PaintApp() {
 
   /* -------------------------------------------------------------- text ---- */
 
+  // Dialog focuses itself in its own effect, which runs after its children's.
+  // A frame later is the simplest way to hand the caret to the field instead.
+  useEffect(() => {
+    if (!textAt) return;
+    const raf = requestAnimationFrame(() =>
+      textFieldRef.current?.querySelector('input')?.focus(),
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [textAt]);
+
   const placeText = () => {
     const c = ctx();
     const at = textAt;
@@ -633,16 +648,17 @@ export default function PaintApp() {
             </>
           }
         >
-          <TextField
-            autoFocus
-            className="w-full"
-            value={textValue}
-            placeholder="Type something"
-            onChange={(e) => setTextValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') placeText();
-            }}
-          />
+          <div ref={textFieldRef}>
+            <TextField
+              className="w-full"
+              value={textValue}
+              placeholder="Type something"
+              onChange={(e) => setTextValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') placeText();
+              }}
+            />
+          </div>
         </Dialog>
       )}
     </AppFrame>

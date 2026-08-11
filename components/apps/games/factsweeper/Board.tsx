@@ -131,12 +131,16 @@ export function BoardView({
         press.current.longFired = false;
         return;
       }
-      if (frozen) return;
       const index = indexFromEvent(e.target);
       if (index === null) return;
       onCursorChange(index);
-      if (flagMode) onFlag(index);
-      else onPrimary(index);
+      if (flagMode) {
+        if (!frozen) onFlag(index);
+        return;
+      }
+      // Primary clicks are forwarded even on a finished board: the app turns
+      // them into "re-read this sector's fact" rather than a dig.
+      onPrimary(index);
     },
     [cancelLongPress, frozen, flagMode, onFlag, onPrimary, onCursorChange],
   );
@@ -181,7 +185,7 @@ export function BoardView({
         case 'Enter':
         case ' ':
           e.preventDefault();
-          if (!frozen) onPrimary(cursor);
+          onPrimary(cursor);
           return;
         case 'f':
         case 'F':

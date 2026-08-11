@@ -226,8 +226,22 @@ export default function FactSweeperApp({ instanceId, setTitle }: AppWindowProps)
 
   const handlePrimary = useCallback(
     (index: number) => {
-      if (status === 'won' || status === 'lost') return;
       const current = board.cells[index];
+
+      // Finished board: clicks only re-read what a sector already gave up, so a
+      // won or lost disk stays browsable.
+      if (status === 'won' || status === 'lost') {
+        if (current.revealed && current.factId) {
+          setReadout({
+            factId: current.factId,
+            repeat: current.factRepeat,
+            extra: 0,
+            reread: true,
+          });
+        }
+        return;
+      }
+
       if (current.flagged) return;
 
       // Already cleared: chord if the flags support it, otherwise just re-read
@@ -399,7 +413,12 @@ export default function FactSweeperApp({ instanceId, setTitle }: AppWindowProps)
               className="os-scroll relative min-h-0 flex-1 overflow-auto p-3"
               style={{ background: 'var(--color-os-well)' }}
             >
-              <div className="flex min-h-full w-full items-start justify-center">
+              {/* `safe center` keeps a board wider than the window reachable —
+                  plain centring would clip its left edge out of scroll range. */}
+              <div
+                className="flex min-h-full w-full items-start"
+                style={{ justifyContent: 'safe center' }}
+              >
                 <BoardView
                   board={board}
                   cellSize={config.cell}
