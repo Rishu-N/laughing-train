@@ -130,7 +130,9 @@ export default function BitWindow({
         left: 6,
         right: 6,
         top: CLASSIC_MENUBAR_HEIGHT + 6,
-        maxHeight: `calc(100% - ${CLASSIC_MENUBAR_HEIGHT + 12}px)`,
+        // A definite height (not just a cap) so `flex-1` bodies and the
+        // accessories' `h-full` roots have something to resolve against.
+        height: `min(${height}px, calc(100% - ${CLASSIC_MENUBAR_HEIGHT + 12}px))`,
       }
     : {
         left: pos.x,

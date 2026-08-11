@@ -71,12 +71,11 @@ export default function BitMenuBar({ menus, right, onMenuOpen }: BitMenuBarProps
   const openIndex = menus.findIndex((m) => m.id === openId);
   const openMenu = openIndex >= 0 ? menus[openIndex] : null;
 
-  const close = useCallback((restoreFocus = false) => {
-    setOpenId((current) => {
-      if (restoreFocus && current) titleRefs.current[current]?.focus();
-      return null;
-    });
+  /** Pass the menu id to put focus back on its title (Escape does). */
+  const close = useCallback((restoreFocusTo?: string) => {
+    setOpenId(null);
     setFocusRow(-1);
+    if (restoreFocusTo) titleRefs.current[restoreFocusTo]?.focus();
   }, []);
 
   const open = useCallback(
@@ -176,7 +175,7 @@ export default function BitMenuBar({ menus, right, onMenuOpen }: BitMenuBarProps
       }
       case 'Escape':
         e.preventDefault();
-        close(true);
+        close(openMenu.id);
         break;
       default:
         break;
@@ -213,7 +212,9 @@ export default function BitMenuBar({ menus, right, onMenuOpen }: BitMenuBarProps
                 className={[
                   'flex cursor-default items-center px-[9px] text-[10px] leading-none select-none',
                   'focus-visible:shadow-[inset_0_0_0_2px_#000] focus-visible:outline-none',
-                  expanded ? 'bg-black text-white' : 'bg-white text-black',
+                  // A pulled-down title inverts. Drawn marks follow
+                  // currentColor; an <img> mark needs the filter to come with.
+                  expanded ? 'bg-black text-white [&_img]:invert' : 'bg-white text-black',
                 ].join(' ')}
               >
                 {menu.mark ?? menu.label}

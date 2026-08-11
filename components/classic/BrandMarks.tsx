@@ -44,11 +44,21 @@ export function ClassicMark({ size = 16, className }: ClassicMarkProps) {
       width={size}
       height={size}
       unoptimized
+      // This is the first thing on screen on every visit — it is the LCP
+      // element, so it must not wait for lazy loading.
+      priority
       className={`pixelated ${className ?? ''}`}
       onError={() => setFailed(true)}
     />
   );
 }
+
+/**
+ * Intrinsic size of brand/rishu-inc.svg. Keep in step with
+ * scripts/generate-brand.mjs — the lockup distorts if these drift.
+ */
+const WORDMARK_W = 228;
+const WORDMARK_H = 52;
 
 export interface WordmarkProps {
   /** Width in px; the wordmark is a landscape lockup. */
@@ -66,7 +76,7 @@ export function RishuIncWordmark({ width = 260, className }: WordmarkProps) {
         className={`${BIT_FONT} flex flex-col items-center gap-2 text-black ${className ?? ''}`}
         style={{ width }}
       >
-        <span className="text-center text-[16px] leading-tight tracking-[0.22em] uppercase">
+        <span className="text-center text-[16px] leading-tight tracking-[0.22em] break-words uppercase">
           {bio.name}
         </span>
         <span aria-hidden="true" className="h-px w-full bg-black" />
@@ -82,9 +92,12 @@ export function RishuIncWordmark({ width = 260, className }: WordmarkProps) {
       src={BRAND_IMAGES.rishuInc}
       alt=""
       width={width}
-      height={Math.round(width * 0.32)}
+      // Derived from the asset's real 228x52 viewBox. A guessed ratio here both
+      // distorts the lockup and makes next/image warn that one dimension was
+      // changed without the other.
+      height={Math.round(width * (WORDMARK_H / WORDMARK_W))}
       unoptimized
-      className={`pixelated h-auto ${className ?? ''}`}
+      className={`pixelated ${className ?? ''}`}
       onError={() => setFailed(true)}
     />
   );

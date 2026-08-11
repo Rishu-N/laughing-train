@@ -14,19 +14,22 @@ import { runs, type PixelMap } from '@/components/classic/icons';
 
 export interface PixelIconProps {
   map: PixelMap;
-  /** Rendered edge length in px. Multiples of 16 stay pixel-perfect. */
+  /** Rendered WIDTH in px; height follows the map's aspect ratio. Multiples of
+   *  the map's column count stay pixel-perfect. */
   size?: number;
   className?: string;
 }
 
 export default function PixelIcon({ map, size = 32, className }: PixelIconProps) {
   const rects = useMemo(() => runs(map), [map]);
+  const cols = map[0]?.length ?? 16;
+  const rows = map.length || 16;
 
   return (
     <svg
       width={size}
-      height={size}
-      viewBox="0 0 16 16"
+      height={Math.round((size * rows) / cols)}
+      viewBox={`0 0 ${cols} ${rows}`}
       shapeRendering="crispEdges"
       aria-hidden="true"
       focusable="false"

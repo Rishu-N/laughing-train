@@ -43,7 +43,9 @@ export function transitionTiming(reducedMotion: boolean): TransitionTiming {
   if (reducedMotion) {
     return { installMs: 320, dissolveMs: 120, revealMs: 180, totalMs: 700, safetyMs: 1600 };
   }
-  return { installMs: 950, dissolveMs: 520, revealMs: 560, totalMs: 2150, safetyMs: 3600 };
+  // Kept tight on purpose: this plays on every visit, and the colour OS still
+  // has its own ~2s boot to run once it lands.
+  return { installMs: 760, dissolveMs: 440, revealMs: 500, totalMs: 1760, safetyMs: 3200 };
 }
 
 /** Dissolve starts once the install bar is full. */
