@@ -8,7 +8,6 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Touc
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppFrame, Button, StatusBar, Toolbar, ToolbarSeparator } from '@/components/os/ui';
 import { useAppSession } from '@/lib/os/persist';
-import type { AppWindowProps } from '@/lib/os/types';
 import { GRID_SIZE, applyMove, canMove, spawnTile, type Direction, type Tile } from './logic';
 
 /* ---------------------------------------------------------------- constants -- */
@@ -63,17 +62,31 @@ interface G2048Session {
   best: number;
 }
 
-export default function G2048App(_props: AppWindowProps) {
+/**
+ * Tile ids only have to be unique among the tiles currently on screen, so a
+ * monotonic module-level sequence is enough. Keeping it out of a ref means the
+ * opening board can be dealt in a lazy `useState` initialiser instead of an
+ * effect — no mount-time setState, and no chance of a recycled id colliding
+ * with a tile still playing its exit animation after "New Game".
+ */
+let tileIdSeq = 0;
+function nextTileId(): number {
+  tileIdSeq += 1;
+  return tileIdSeq;
+}
+
+/** Deals a fresh two-tile opening board. */
+function dealBoard(): Tile[] {
+  const first = spawnTile([], nextTileId);
+  const rest = first ? spawnTile([first], nextTileId) : null;
+  return [first, rest].filter((t): t is Tile => t !== null);
+}
+
+export default function G2048App() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const idCounterRef = useRef(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  const nextId = useCallback(() => {
-    idCounterRef.current += 1;
-    return idCounterRef.current;
-  }, []);
-
-  const [tiles, setTiles] = useState<Tile[]>([]);
+  const [tiles, setTiles] = useState<Tile[]>(dealBoard);
   const [score, setScore] = useState(0);
   const [status, setStatus] = useState<Status>('playing');
   const [wonAcknowledged, setWonAcknowledged] = useState(false);
@@ -81,21 +94,12 @@ export default function G2048App(_props: AppWindowProps) {
   const [session, setSession] = useAppSession<G2048Session>('g2048', { best: 0 });
 
   const newGame = useCallback(() => {
-    idCounterRef.current = 0;
-    const first = spawnTile([], nextId);
-    const rest = first ? spawnTile([first], nextId) : null;
-    setTiles([first, rest].filter((t): t is Tile => t !== null));
+    setTiles(dealBoard());
     setScore(0);
     setStatus('playing');
     setWonAcknowledged(false);
     setUndoSnapshot(null);
     containerRef.current?.focus();
-  }, [nextId]);
-
-  // Deal the opening board once on mount.
-  useEffect(() => {
-    newGame();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -107,7 +111,7 @@ export default function G2048App(_props: AppWindowProps) {
     const result = applyMove(tiles, dir);
     if (!result.moved) return;
 
-    const spawned = spawnTile(result.tiles, nextId);
+    const spawned = spawnTile(result.tiles, nextTileId);
     const nextTiles = spawned ? [...result.tiles, spawned] : result.tiles;
     const nextScore = score + result.gained;
 

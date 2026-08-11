@@ -14,7 +14,6 @@ import {
 } from 'react';
 import { AppFrame, Button, IconButton, StatusBar, Toolbar, ToolbarSeparator } from '@/components/os/ui';
 import { useAppSession } from '@/lib/os/persist';
-import type { AppWindowProps } from '@/lib/os/types';
 
 /* ---------------------------------------------------------------- constants -- */
 
@@ -106,7 +105,7 @@ interface SnakeSession {
   highScore: number;
 }
 
-export default function SnakeApp(_props: AppWindowProps) {
+export default function SnakeApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

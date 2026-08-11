@@ -92,6 +92,14 @@ export function useAppSession<T>(
     };
   }, [appId, value, hydrated]);
 
+  // Latest value, mirrored into a ref so the unmount flush below can read it
+  // without re-subscribing on every keystroke. Written in an effect (never
+  // during render) so React's concurrent rendering can discard a render safely.
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
   // Flush on unmount and on tab hide, so closing a window or navigating away
   // never loses the last few keystrokes sitting in the debounce window.
   useEffect(() => {
@@ -106,9 +114,6 @@ export function useAppSession<T>(
       flush();
     };
   }, [appId, hydrated]);
-
-  const valueRef = useRef(value);
-  valueRef.current = value;
 
   const reset = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);

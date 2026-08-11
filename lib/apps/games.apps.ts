@@ -6,13 +6,16 @@
  */
 import dynamic from 'next/dynamic';
 import { APP_ICONS } from '@/content/images';
-import type { AppDefinition } from '@/lib/os/types';
+import type { AppDefinition, AppWindowProps } from '@/lib/os/types';
 
 // ssr: false is REQUIRED — these apps touch canvas, localStorage and window.
-const SnakeApp = dynamic(() => import('@/components/apps/games/snake/SnakeApp'), {
+// The explicit <AppWindowProps> generic is what makes these assignable to
+// AppDefinition['component']: neither game reads its props, so without it
+// next/dynamic infers ComponentType<{}>.
+const SnakeApp = dynamic<AppWindowProps>(() => import('@/components/apps/games/snake/SnakeApp'), {
   ssr: false,
 });
-const G2048App = dynamic(() => import('@/components/apps/games/g2048/G2048App'), {
+const G2048App = dynamic<AppWindowProps>(() => import('@/components/apps/games/g2048/G2048App'), {
   ssr: false,
 });
 
