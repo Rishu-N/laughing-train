@@ -11,7 +11,13 @@
  *   useWindowStore.getState().openApp('paint');
  */
 import { create } from 'zustand';
-import { LAYERS, MENUBAR_HEIGHT, DOCK_WIDTH } from './layers';
+import {
+  DOCK_HEIGHT_MOBILE,
+  DOCK_WIDTH,
+  LAYERS,
+  MENUBAR_HEIGHT,
+  MOBILE_BREAKPOINT,
+} from './layers';
 import { getApp } from './registry';
 import type { OpenAppOptions, WindowInstance } from './types';
 
@@ -20,6 +26,40 @@ const DEFAULT_MIN_SIZE = { width: 240, height: 160 };
 /** Each new cascaded window steps down-right by this much from the last. */
 const CASCADE_STEP = 26;
 const CASCADE_WRAP = 6;
+
+/** How much of a window must stay inside the work area at all times. */
+const MIN_ONSCREEN = 96;
+
+/** Window coordinates are viewport coordinates; this is the usable slab. */
+interface WorkArea {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+function currentViewport(vp?: { width: number; height: number }) {
+  if (vp) return vp;
+  if (typeof window === 'undefined') return { width: 1280, height: 800 };
+  return { width: window.innerWidth, height: window.innerHeight };
+}
+
+/** The desktop minus the menu bar and the dock. */
+function workArea(vp?: { width: number; height: number }): WorkArea {
+  const v = currentViewport(vp);
+  const mobile = v.width < MOBILE_BREAKPOINT;
+  return {
+    left: 0,
+    top: MENUBAR_HEIGHT,
+    width: Math.max(v.width - (mobile ? 0 : DOCK_WIDTH), DEFAULT_MIN_SIZE.width),
+    height: Math.max(
+      v.height - MENUBAR_HEIGHT - (mobile ? DOCK_HEIGHT_MOBILE : 0),
+      DEFAULT_MIN_SIZE.height,
+    ),
+  };
+}
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
 
 let instanceCounter = 0;
 function nextInstanceId(appId: string) {
@@ -46,6 +86,17 @@ export interface WindowStore {
   resizeWindow: (instanceId: string, width: number, height: number) => void;
   setTitle: (instanceId: string, title: string) => void;
   closeAll: () => void;
+
+  /**
+   * Drop focus without minimizing anything — what clicking bare desktop does.
+   * Windows stay where they are; the topmost one simply stops looking active.
+   */
+  defocusAll: () => void;
+  /**
+   * Re-clamp every window into the work area. Called by the shell on viewport
+   * resize so a window can never end up stranded outside the screen.
+   */
+  clampToViewport: (viewport?: { width: number; height: number }) => void;
 }
 
 export const useWindowStore = create<WindowStore>((set, get) => ({
@@ -73,8 +124,17 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
       }
     }
 
-    const size = opts?.size ?? def.defaultSize;
     const instanceId = nextInstanceId(appId);
+    const area = workArea();
+
+    // A 720px-wide default on a 900px screen would open half off the edge, so
+    // opening size is always clamped to what the desktop can actually show.
+    const requested = opts?.size ?? def.defaultSize;
+    const min = def.minSize ?? DEFAULT_MIN_SIZE;
+    const size = {
+      width: Math.max(Math.min(requested.width, area.width), Math.min(min.width, area.width)),
+      height: Math.max(Math.min(requested.height, area.height), Math.min(min.height, area.height)),
+    };
 
     set((state) => {
       const z = state.topZ + 1;
@@ -84,18 +144,21 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
       if (!position) {
         const step = cascadeIndex % CASCADE_WRAP;
         position = {
-          x: 60 + step * CASCADE_STEP,
-          y: MENUBAR_HEIGHT + 24 + step * CASCADE_STEP,
+          x: area.left + 48 + step * CASCADE_STEP,
+          y: area.top + 20 + step * CASCADE_STEP,
         };
         cascadeIndex = cascadeIndex + 1;
       }
+
+      const x = clamp(position.x, area.left, Math.max(area.left, area.left + area.width - size.width));
+      const y = clamp(position.y, area.top, Math.max(area.top, area.top + area.height - size.height));
 
       const win: WindowInstance = {
         instanceId,
         appId,
         title: def.title,
-        x: position.x,
-        y: position.y,
+        x,
+        y,
         width: size.width,
         height: size.height,
         zIndex: z,
@@ -165,16 +228,15 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             ? { ...w, maximized: false, x: r.x, y: r.y, width: r.width, height: r.height }
             : { ...w, maximized: false };
         }
-        const vw = viewport?.width ?? (typeof window !== 'undefined' ? window.innerWidth : 1280);
-        const vh = viewport?.height ?? (typeof window !== 'undefined' ? window.innerHeight : 800);
+        const area = workArea(viewport);
         return {
           ...w,
           maximized: true,
           restoreRect: { x: w.x, y: w.y, width: w.width, height: w.height },
-          x: 0,
-          y: MENUBAR_HEIGHT,
-          width: Math.max(vw - DOCK_WIDTH, DEFAULT_MIN_SIZE.width),
-          height: Math.max(vh - MENUBAR_HEIGHT, DEFAULT_MIN_SIZE.height),
+          x: area.left,
+          y: area.top,
+          width: area.width,
+          height: area.height,
         };
       }),
     })),
@@ -228,7 +290,30 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
       ),
     })),
 
-  closeAll: () => set({ windows: [], focusedId: null }),
+  closeAll: () => set({ windows: [], focusedId: null, cascadeIndex: 0 }),
+
+  defocusAll: () => {
+    if (get().focusedId === null) return;
+    set({ focusedId: null });
+  },
+
+  clampToViewport: (viewport) => {
+    const area = workArea(viewport);
+    set((state) => {
+      let changed = false;
+      const windows = state.windows.map((w) => {
+        const width = Math.min(w.width, area.width);
+        const height = Math.min(w.height, area.height);
+        // Always leave a grabbable strip of title bar inside the work area.
+        const x = clamp(w.x, area.left - width + MIN_ONSCREEN, area.left + area.width - MIN_ONSCREEN);
+        const y = clamp(w.y, area.top, area.top + area.height - MENUBAR_HEIGHT);
+        if (x === w.x && y === w.y && width === w.width && height === w.height) return w;
+        changed = true;
+        return { ...w, x, y, width, height };
+      });
+      return changed ? { windows } : {};
+    });
+  },
 }));
 
 /** Highest-z window that is not minimized, or null. */
