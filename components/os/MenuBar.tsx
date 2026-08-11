@@ -199,7 +199,7 @@ export default function MenuBar() {
               {grouped.length === 0 && <MenuItem disabled>No apps registered</MenuItem>}
 
               {grouped.map((group, gi) => (
-                <div key={group.key}>
+                <div key={group.key} role="group" aria-label={group.label}>
                   {gi > 0 && <MenuSeparator />}
                   <MenuHeading>{group.label}</MenuHeading>
                   {group.items.map((a) => (

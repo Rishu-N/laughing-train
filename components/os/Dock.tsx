@@ -19,9 +19,8 @@ import { useIsMobile } from './useIsMobile';
 
 interface Tip {
   text: string;
-  /** Viewport coordinates of the tile the tip belongs to. */
+  /** Viewport y of the tile's centre — the tip is vertically centred on it. */
   top: number;
-  left: number;
 }
 
 export default function Dock() {
@@ -38,7 +37,7 @@ export default function Dock() {
     (e: React.SyntheticEvent<HTMLElement>, text: string) => {
       if (isMobile) return;
       const r = e.currentTarget.getBoundingClientRect();
-      setTip({ text, top: r.top + r.height / 2, left: r.left });
+      setTip({ text, top: r.top + r.height / 2 });
     },
     [isMobile],
   );
@@ -61,7 +60,7 @@ export default function Dock() {
 
   return (
     <div
-      aria-label="Dock"
+      data-dock
       className={[
         'fixed flex border-os-ink bg-os-chrome',
         isMobile ? 'inset-x-0 bottom-0 border-t' : 'right-0 border-l',
@@ -160,12 +159,7 @@ export default function Dock() {
         <div
           role="tooltip"
           className="os-window pointer-events-none fixed max-w-[220px] truncate rounded-[2px] px-2 py-[3px] text-[10px] leading-none os-chrome-text"
-          style={{
-            top: tip.top,
-            right: DOCK_WIDTH + 8,
-            transform: 'translateY(-50%)',
-            backgroundColor: 'var(--color-os-chrome)',
-          }}
+          style={{ top: tip.top, right: DOCK_WIDTH + 8, transform: 'translateY(-50%)' }}
         >
           {tip.text}
         </div>
