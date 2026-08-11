@@ -287,7 +287,7 @@ export function runCommand(raw: string, ctx: CommandContext): ParseResult {
   if (!spec) return { type: 'llm', input };
 
   // Everything after the command word, whitespace preserved — `echo` needs it.
-  const rest = input.slice(head.length).replace(/^\s/, '');
+  const rest = input.slice(head.length).replace(/^\s+/, '');
   return { type: 'command', name, outcome: spec.run(args, ctx, rest) };
 }
 
