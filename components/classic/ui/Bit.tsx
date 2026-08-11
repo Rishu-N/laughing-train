@@ -10,7 +10,7 @@
  * a 1987 idea. Everything below is black on white, square-cornered, and flat.
  * A "gray" is always a checkerboard of black pixels, never a gray value.
  */
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { WHITE_DITHER_STYLE } from '@/lib/classic/patterns';
 
 /** Silkscreen, the pixel font. Unreadable above ~11px, so nothing here is. */
@@ -43,7 +43,7 @@ export function Dithered({
 
 /* --------------------------------------------------------------- button ----- */
 
-export interface BitButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface BitButtonProps extends ComponentPropsWithRef<'button'> {
   /** The dialog's default action — gets the heavy outer ring. */
   primary?: boolean;
 }
@@ -87,7 +87,7 @@ export function BitKey({
   children,
   pressed = false,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { pressed?: boolean }) {
+}: ComponentPropsWithRef<'button'> & { pressed?: boolean }) {
   return (
     <button
       type="button"

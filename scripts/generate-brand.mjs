@@ -215,7 +215,7 @@ function show(name, rows) {
 function preview(name, rows, palette, scale = 8) {
   if (!PREVIEW_DIR) return;
   mkdirSync(PREVIEW_DIR, { recursive: true });
-  // Previews get an opaque white ground so transparency is not mistaken for ink.
+  // Previews get an opaque ground so transparency is not mistaken for white ink.
   const solid = { ...palette };
   const flat = rows.map((r) => r.split('').map((c) => (palette[c] ? c : '_')).join(''));
   solid._ = '#f2f2f2';
@@ -239,7 +239,7 @@ function plateMask(N, cut) {
 
 /**
  * 4-connected distance from outside the mask: 1 on the outermost ring of the
- * shape, 2 on the next ring in, and so on. Lets rules be inset by a exact
+ * shape, 2 on the next ring in, and so on. Lets rules be inset by an exact
  * number of pixels and still follow the cut corners.
  */
 function insetDistance(mask) {

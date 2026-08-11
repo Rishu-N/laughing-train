@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "placeholders": "node scripts/generate-placeholders.mjs",
+    "brand": "node scripts/generate-brand.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
