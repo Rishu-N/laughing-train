@@ -108,6 +108,8 @@ export default function FactSweeperApp({ instanceId, setTitle }: AppWindowProps)
   const [dossierOpen, setDossierOpen] = useState(false);
 
   const startedAt = useRef(0);
+  /** Ids drawn this render-tick, before the session write has come back. */
+  const justDrawn = useRef<Set<string>>(new Set());
   const bodyRef = useRef<HTMLDivElement>(null);
 
   /* ------------------------------------------------------------ layout ---- */
@@ -165,8 +167,13 @@ export default function FactSweeperApp({ instanceId, setTitle }: AppWindowProps)
    * immediately — that immediacy is what makes losing harmless.
    */
   const assignFacts = useCallback(
-    (next: Board, opened: number[], reread = false) => {
-      const draws = drawFacts(difficulty, recovered, opened.length);
+    (next: Board, opened: number[]) => {
+      // Session state lands a render later than the click that caused it, so
+      // two fast clicks would otherwise draw against the same stale set.
+      // `justDrawn` bridges that gap; storage catches up right below.
+      const known = new Set(recovered);
+      for (const id of justDrawn.current) known.add(id);
+      const draws = drawFacts(difficulty, known, opened.length);
       const fresh: string[] = [];
       opened.forEach((cellIndex, i) => {
         const draw = draws[i];
@@ -182,9 +189,11 @@ export default function FactSweeperApp({ instanceId, setTitle }: AppWindowProps)
           factId: latest.factId,
           repeat: latest.repeat,
           extra: draws.length - 1,
-          reread,
+          reread: false,
         });
       }
+
+      for (const id of fresh) justDrawn.current.add(id);
 
       if (fresh.length > 0) {
         setRoundFresh((n) => n + fresh.length);
@@ -307,6 +316,7 @@ export default function FactSweeperApp({ instanceId, setTitle }: AppWindowProps)
   );
 
   const handleResetDossier = useCallback(() => {
+    justDrawn.current = new Set();
     resetSession();
     setAskingReset(false);
     startGame(difficulty);
@@ -392,7 +402,9 @@ export default function FactSweeperApp({ instanceId, setTitle }: AppWindowProps)
       status={
         <StatusBar className="overflow-hidden">
           <span className="shrink-0">{statusText}</span>
-          <span className="truncate text-os-ink-soft">
+          {/* The one status item allowed to shrink and ellipsize when the
+              window gets tight; the counts either side stay legible. */}
+          <span className="min-w-0 truncate text-os-ink-soft">
             {config.volume} · {cleared}/{safeTotal} sectors
           </span>
           <ToolbarSpacer />

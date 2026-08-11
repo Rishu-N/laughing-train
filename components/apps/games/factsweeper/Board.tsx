@@ -291,11 +291,9 @@ function CellView({
       content = String(cell.adjacent);
       color = NUMBER_COLORS[cell.adjacent];
     }
-    label = fact
-      ? `recovered ${fact.label}: ${fact.value}`
-      : cell.adjacent > 0
-        ? `${cell.adjacent} adjacent corrupted`
-        : 'clear sector';
+    label =
+      (cell.adjacent > 0 ? `${cell.adjacent} adjacent corrupted` : 'clear sector') +
+      (fact ? `, recovered — ${fact.label}: ${fact.value}` : '');
   }
 
   return (
