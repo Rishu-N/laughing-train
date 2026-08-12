@@ -1,10 +1,19 @@
 # A portfolio that boots
 
-A personal portfolio built as a **Macintosh System 7 desktop**. It boots with a
-Happy Mac, opens a 1996-era web browser showing your bio, and everything else —
-your projects, a paint program, a word processor, a spreadsheet, a terminal
-wired to an LLM, and three games — is an app you can open, drag, collapse into
-the dock and close.
+A personal portfolio you don't scroll — you boot it.
+
+Every visit starts in a bare **1984 black-and-white machine**: a thin menu bar,
+chunky bitmap icons, and desk accessories (the Calculator and the sliding Puzzle
+actually work). A few seconds in, a **Software Update** notification drops in
+from the top left. Accept it, the old mark dissolves through a dither, the
+"Rishu Inc" wordmark resolves out the other side — and you land in the full
+**System 7 colour desktop**: a 1996-era web browser showing your bio, plus your
+projects, a paint program, a word processor, a spreadsheet, a terminal wired to
+an LLM, and three games, each an app you can open, drag, collapse into the dock
+and close. `Restart…` in the logo menu takes you back to 1984.
+
+Somewhere in there is **Rishu**, who shows up rarely, winks, and leaves. There
+is no way to summon him. That's deliberate.
 
 Everything runs in the browser. The only server-side code in the whole project
 is one API route for the Terminal's assistant, and even that is optional.
@@ -28,6 +37,7 @@ That's it — no configuration, no API keys, no database. Other scripts:
 | `npm run lint` | ESLint |
 | `npm run test:e2e` | Playwright smoke suite (boots the dev server itself) |
 | `npm run placeholders` | Regenerate the placeholder images in `public/images/` |
+| `npm run brand` | Regenerate the brand marks in `public/images/brand/` (and the two `desktop/` marks) |
 
 ### The optional terminal key
 
@@ -72,21 +82,35 @@ are optional and where each one shows up on screen.
 
 ```
 app/
-  page.tsx              renders <Desktop /> — the entire OS is one route
+  page.tsx              renders <Stage /> — the whole site is one route
   api/terminal/route.ts the ONLY server-side code
   globals.css           design tokens (@theme) + System 7 chrome utilities
 components/
-  os/                   the shell: Desktop, Window, MenuBar, Dock, BootSequence
+  stage/Stage.tsx       which shell is on screen: classic → updating → colour
+  classic/              the 1984 shell: 1-bit UI, desk accessories, the handoff
+  mascot/               Rishu
+  os/                   the colour shell: Desktop, Window, MenuBar, Dock, Boot
   os/ui/                shared System 7 primitives (Button, Dialog, AppFrame…)
-  apps/<name>/          one folder per app
+  apps/<name>/          one folder per colour-OS app
 lib/
+  os/stageStore.ts      the classic ⇄ colour stage machine
   os/windowStore.ts     the window manager (Zustand)
   os/registry.ts        the app registry — the union of every manifest
   os/persist.ts         useAppSession: debounced, SSR-safe session storage
   apps/*.apps.ts        app manifests
+  classic/              1-bit logic: dither, calculator, puzzle, timing
 content/                everything user-editable
 public/images/          placeholder art, labelled by slot
 ```
+
+**Two shells, one stage machine.** `lib/os/stageStore.ts` holds
+`classic → updating → color`, and `Stage` mounts exactly one of them. The classic
+shell is deliberately its own small world — it does **not** reuse the System 7
+window manager or primitives, because 1-bit windows have no bevel, no dock, no
+resize and no zoom, and threading a "variant" flag through chrome that shares
+almost nothing would have cost more than it saved. `Restart…` in the colour OS
+logo menu sets the stage back to `classic`; `Stage` keys the colour desktop on a
+generation counter so a restart genuinely replays its boot.
 
 **Window manager.** `lib/os/windowStore.ts` owns every open window: position,
 size, focus, z-index, minimize and maximize. Components never set a z-index

@@ -1,9 +1,13 @@
 'use client';
 
 /**
- * Cold boot: a Happy Mac, a beat, extensions loading along the bottom, then a
+ * Cold boot: the boot mark, a beat, extensions loading along the bottom, then a
  * clean fade to the desktop. Budget is ~2s — this is a portfolio, nobody should
  * wait to see it.
+ *
+ * The mark is an original design (see scripts/generate-brand.mjs). It is
+ * deliberately not a smiling-computer icon: this project reproduces no Apple
+ * trademark or artwork anywhere.
  *
  * OWNER: OS Shell agent.
  *

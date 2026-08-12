@@ -62,12 +62,32 @@ Ownership was the collision-avoidance mechanism — see `CONTRACT.md` §1.
 - Spreadsheet: single-cell selection only — no drag-select, fill handle or column
   resizing.
 
-## Phase 3 — Classic 1984 boot + Software Update + Rishu mascot (not started)
+## Phase 3 — Classic 1984 boot + Software Update + Rishu mascot ✅
 
-A monochrome System-1-style screen becomes the new front door, handing off to the
-existing colour OS via a "Software Update" transition. Runs on every visit with no
-skip; a `Restart` item in the colour OS returns to it.
+| # | Agent | Model | Status |
+| --- | --- | --- | --- |
+| A | Brand / Assets | Opus | ✅ |
+| B | Classic Boot shell | Opus | ✅ |
+| C | Rishu mascot | Opus | ✅ |
 
-**Includes required trademark cleanup:** `public/images/desktop/happy-mac.svg` and
-`logo.svg` must be replaced with original marks — the brief forbids reproducing Apple
-trademarks anywhere in this project, and those two currently do.
+- [x] Classic 1-bit shell is the front door, every visit, no skip
+- [x] Seven desk accessories; **Calculator and Puzzle genuinely functional**
+- [x] No web browser on the classic screen (correct for 1984)
+- [x] "Software Update Available" drops in from the top left at 2.8s
+- [x] Dissolve transition hands off to the colour OS (~2.15s), with a safety
+      timeout so a dropped animation callback can't strand the visitor
+- [x] `Restart…` in the colour OS logo menu returns to 1984
+- [x] Rishu appears rarely in both shells, rarer in colour, with no summonable trigger
+- [x] Original brand marks: classic mark, "Rishu Inc" wordmark, 32×32 1-bit portrait
+- [x] **Trademark cleanup done** — `happy-mac.svg` and the rainbow `logo.svg` are
+      gone, replaced by originals. No Apple trademark or artwork anywhere.
+- [x] `tsc`, `eslint`, `build` clean; **e2e 48 passed / 0 failed** through the new
+      front door
+
+### Phase 3 known gaps
+
+- Alarm Clock, Note Pad, most of Control Panel and About This Machine are cosmetic
+  homages rather than working software. Scrapbook, Key Caps and the Control Panel's
+  pattern picker do work.
+- The classic shell has no window resize or collapse — correct for 1984, but it does
+  mean the desk accessories are fixed-size.
