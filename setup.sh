@@ -115,7 +115,19 @@ fi
 printf '    %sThe site works fully without an API key. Add one to .env.local only if\n' "$DIM"
 printf '    you want the Terminal app to talk to a real model.%s\n' "$RESET"
 
-# ── 4. Images ────────────────────────────────────────────────────────────────
+# ── 4. Telemetry ─────────────────────────────────────────────────────────────
+step "Turning off Next.js telemetry"
+
+# Next.js posts anonymous usage data to Vercel by default. This project is meant
+# to run entirely offline, so opt out — it's the only thing left that would call
+# out to the internet on its own.
+if npx --no-install next telemetry disable >/dev/null 2>&1; then
+  ok "telemetry disabled"
+else
+  warn "couldn't disable telemetry automatically (harmless — run 'npx next telemetry disable')"
+fi
+
+# ── 5. Images ────────────────────────────────────────────────────────────────
 step "Checking placeholder art"
 
 if [ -f public/images/portrait/self-portrait-placeholder.png ] &&
@@ -127,7 +139,7 @@ else
   ok "generated placeholder art and brand marks"
 fi
 
-# ── 5. Sanity check ──────────────────────────────────────────────────────────
+# ── 6. Sanity check ──────────────────────────────────────────────────────────
 step "Checking the project compiles"
 
 if npm run typecheck >/dev/null 2>&1; then

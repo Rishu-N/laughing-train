@@ -66,6 +66,37 @@ is one API route for the Terminal's assistant, and even that is optional.
 
 ---
 
+## It runs completely offline
+
+Once `./setup.sh` has finished (that part needs the internet, to download
+dependencies), **nothing in this project makes a network request.** You can pull
+the repo, get on a plane, and it works.
+
+| Thing that would normally phone home | What we do instead |
+| --- | --- |
+| Google Fonts | The two pixel fonts are **vendored** into `app/fonts/` (14 KB, OFL licensed). `next/font/google` fetches at build time and would fail the build with no internet — self-hosting is what makes offline work at all |
+| Body text fonts | A **system** stack (Geneva / Verdana / Helvetica) — nothing to download |
+| Images | All local and generated — `npm run placeholders` and `npm run brand` draw them from scratch, no CDN |
+| The Terminal's assistant | Answers **locally** from `content/` when there's no key or no connection — see below |
+| Next.js telemetry | `setup.sh` disables it |
+| External links | Your socials are plain links. They obviously need the internet if you *click* them, but nothing loads them in the background |
+
+Verified by building and running with all outbound network blocked.
+
+### The Terminal without a connection
+
+The Terminal parses `help`, `ls`, `open <app>`, `whoami`, `projects` and friends
+locally. Anything else goes to a **local answering layer**
+(`lib/terminal/offlineAnswers.ts`) that responds from your own `content/` files —
+who you are, what you've built, your skills, how to reach you, what the games
+are. It's a keyword matcher, not an AI, and it's honest about that.
+
+You get this whenever there's no API key **or** no connection — including the
+case where you have a key configured but you're offline. Adding a topic is one
+entry in the `TOPICS` array.
+
+---
+
 ## The optional terminal key
 
 The Terminal parses `help`, `ls`, `open <app>`, `whoami`, `projects` and friends

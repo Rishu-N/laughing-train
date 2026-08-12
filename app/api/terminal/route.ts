@@ -20,6 +20,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { bio } from '@/content/bio';
 import { projects } from '@/content/projects';
 import { terminalPersona } from '@/content/terminal';
+import { answerOffline } from '@/lib/terminal/offlineAnswers';
 
 export const runtime = 'nodejs';
 
@@ -100,10 +101,21 @@ function randomOffline(): string {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function offline(): Response {
-  // 200, always. The client treats a non-200 as a hard failure, and a dead
-  // model is not a hard failure — it is a 1991 machine with a bad phone line.
-  return Response.json({ reply: randomOffline(), offline: true }, { status: 200 });
+/**
+ * The no-model answer.
+ *
+ * 200, always. The client treats a non-200 as a hard failure, and a dead model
+ * is not a hard failure — it is a 1991 machine with a bad phone line.
+ *
+ * When we have the user's question we try to answer it locally from content/
+ * first, so the terminal is genuinely useful with no key and no internet. Only
+ * when the local brain doesn't recognise the question do we fall back to a
+ * quip. `input` is omitted for upstream failures, where a quip is the honest
+ * answer.
+ */
+function offline(input?: string): Response {
+  const reply = input ? answerOffline(input) : randomOffline();
+  return Response.json({ reply, offline: true }, { status: 200 });
 }
 
 interface Turn {
@@ -224,9 +236,10 @@ export async function POST(req: Request) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    // No key configured. This is the expected state for a fresh clone, so it
-    // is a normal, in-character answer rather than an error.
-    return offline();
+    // No key configured. This is the expected state for a fresh clone and the
+    // only state that works with no internet, so it is a normal answer rather
+    // than an error — and we answer the question locally where we can.
+    return offline(input);
   }
 
   try {
@@ -252,12 +265,15 @@ export async function POST(req: Request) {
       .join('\n');
 
     const reply = tidy(text);
-    if (!reply) return offline();
+    if (!reply) return offline(input);
 
     return Response.json({ reply, offline: false }, { status: 200 });
   } catch {
-    // Bad key, quota, network, upstream outage — the terminal never sees a
-    // stack trace, and never a 500. It just loses carrier.
-    return offline();
+    // Bad key, quota, upstream outage — or, most likely, no internet at all.
+    // The terminal never sees a stack trace and never a 500; it falls back to
+    // the same local brain used when no key is configured, so someone working
+    // offline with a key in .env.local still gets real answers rather than a
+    // shrug.
+    return offline(input);
   }
 }
