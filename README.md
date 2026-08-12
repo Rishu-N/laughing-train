@@ -2,44 +2,71 @@
 
 A personal portfolio you don't scroll — you boot it.
 
-Every visit starts in a bare **1984 black-and-white machine**: a thin menu bar,
-chunky bitmap icons, and desk accessories (the Calculator and the sliding Puzzle
-actually work). A few seconds in, a **Software Update** notification drops in
-from the top left. Accept it, the old mark dissolves through a dither, the
-"Rishu Inc" wordmark resolves out the other side — and you land in the full
-**System 7 colour desktop**: a 1996-era web browser showing your bio, plus your
-projects, a paint program, a word processor, a spreadsheet, a terminal wired to
-an LLM, and three games, each an app you can open, drag, collapse into the dock
-and close. `Restart…` in the logo menu takes you back to 1984.
-
-Somewhere in there is **Rishu**, who shows up rarely, winks, and leaves. There
-is no way to summon him. That's deliberate.
-
-Everything runs in the browser. The only server-side code in the whole project
-is one API route for the Terminal's assistant, and even that is optional.
-
 ---
 
-## Quickstart
+## Run it
+
+Two commands. You need [Node.js](https://nodejs.org) 20.9 or newer (22 LTS is
+ideal) — the setup script checks for you and tells you what to do if not.
+
+```bash
+./setup.sh          # installs everything, one time
+npm run dev         # start it
+```
+
+Then open **http://localhost:3000**.
+
+That's the whole thing. No API keys, no database, no accounts, no config.
+
+<details>
+<summary>Windows, or prefer to do it by hand?</summary>
+
+`setup.sh` needs a bash shell — on Windows use **Git Bash** or **WSL**. Or just
+run the steps yourself, they're the same three things:
 
 ```bash
 npm install
-npm run dev            # http://localhost:3000
+cp .env.example .env.local     # optional; the site runs fine without it
+npm run dev
 ```
+</details>
 
-That's it — no configuration, no API keys, no database. Other scripts:
+### What you'll see
+
+1. A bare **1984 black-and-white machine** boots up. Poke around the menu in the
+   top-left corner — the Calculator and the sliding Puzzle genuinely work.
+2. After a few seconds a **"Software Update Available"** notice drops in from the
+   top left. Click **Install**.
+3. The old mark dissolves through a dither, the *Rishu Inc* wordmark resolves out
+   the other side, and you land in the **System 7 colour desktop** — a 1996-era
+   web browser already open on your bio, plus your projects, a paint program, a
+   word processor, a spreadsheet, an LLM-wired terminal and three games. Each one
+   is an app you can open, drag, collapse into the dock and close.
+4. `Restart…` in the logo menu, top right, takes you back to 1984.
+
+Somewhere in there is **Rishu**, who shows up rarely, winks, and leaves. There is
+no way to summon him. That's deliberate.
+
+Everything runs in your browser. The only server-side code in the whole project
+is one API route for the Terminal's assistant, and even that is optional.
+
+### Every command
 
 | Script | Does |
 | --- | --- |
-| `npm run dev` | Dev server |
+| `./setup.sh` | Install and configure everything (safe to re-run) |
+| `./setup.sh --start` | ...and start the dev server straight after |
+| `npm run dev` | Dev server on http://localhost:3000 |
 | `npm run build` / `npm start` | Production build and serve |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:e2e` | Playwright smoke suite (boots the dev server itself) |
-| `npm run placeholders` | Regenerate the placeholder images in `public/images/` |
-| `npm run brand` | Regenerate the brand marks in `public/images/brand/` (and the two `desktop/` marks) |
+| `npm run test:e2e` | Playwright suite (starts the dev server itself) |
+| `npm run placeholders` | Regenerate the placeholder art in `public/images/` |
+| `npm run brand` | Regenerate the brand marks |
 
-### The optional terminal key
+---
+
+## The optional terminal key
 
 The Terminal parses `help`, `ls`, `open <app>`, `whoami`, `projects` and friends
 locally. Anything it doesn't recognise is passed to an LLM — **if** you've given

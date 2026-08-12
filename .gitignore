@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...but the template MUST be committed, or a fresh clone has nothing to copy
+# from and setup.sh has no key file to create.
+!.env.example
 
 # vercel
 .vercel

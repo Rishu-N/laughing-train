@@ -2,7 +2,11 @@
   "name": "laughing-train",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
+    "setup": "./setup.sh",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
