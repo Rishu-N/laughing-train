@@ -2,6 +2,10 @@
 
 A personal portfolio you don't scroll — you boot it.
 
+> **Working on this with an AI agent?** Point it at **[`HANDOFF.md`](./HANDOFF.md)**
+> first — it carries the decisions, constraints and hard-won gotchas that aren't
+> visible in the code.
+
 ---
 
 ## Run it
