@@ -5,6 +5,11 @@
  *
  * Deliberately dumb: no formatting, no files, one document. "New" is the only
  * destructive action and it sits behind a confirm.
+ *
+ * It is also the OS's dictation sink: while this window is open, transcripts
+ * from WhisperFlow are appended to the document. That coupling runs entirely
+ * through lib/os/dictation.ts — Notes knows nothing about WhisperFlow and does
+ * not import it.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -16,6 +21,7 @@ import {
   Toolbar,
   ToolbarSpacer,
 } from '@/components/os/ui';
+import { useDictationStore } from '@/lib/os/dictation';
 import { useAppSession } from '@/lib/os/persist';
 import type { AppWindowProps } from '@/lib/os/types';
 
@@ -57,6 +63,43 @@ export default function NotesApp({ setTitle }: AppWindowProps) {
   useEffect(() => {
     if (hydrated) textRef.current?.focus();
   }, [hydrated]);
+
+  /* ------------------------------------------------------------ dictation -- */
+
+  const lastDictation = useDictationStore((s) => s.last);
+  const setSinkReady = useDictationStore((s) => s.setSinkReady);
+
+  // Announce that a sink is on screen, so WhisperFlow can tell the user where
+  // their words are about to land instead of guessing. Minimized windows stay
+  // mounted, so a collapsed Notes still receives dictation — which is right.
+  useEffect(() => {
+    setSinkReady(true);
+    return () => setSinkReady(false);
+  }, [setSinkReady]);
+
+  // Highest utterance id already written into the document. Null until the
+  // stored note has hydrated, at which point the session's backlog is adopted
+  // as "seen" — opening Notes should not replay everything dictated before it
+  // existed, and appending before hydration would be overwritten anyway.
+  const seenDictation = useRef<number | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (seenDictation.current === null) {
+      seenDictation.current = lastDictation?.id ?? 0;
+      return;
+    }
+    if (!lastDictation || lastDictation.id <= seenDictation.current) return;
+    seenDictation.current = lastDictation.id;
+
+    // Demo transcripts are scripted, not heard. The tag is the only place that
+    // distinction survives once the text is sitting in a plain-text document.
+    const line =
+      lastDictation.source === 'demo' ? `[demo] ${lastDictation.text}` : lastDictation.text;
+    setDoc((d) => ({
+      ...d,
+      text: d.text.trim().length === 0 ? line : `${d.text.replace(/\s*$/, '')}\n${line}`,
+    }));
+  }, [hydrated, lastDictation, setDoc]);
 
   const lineNumbers = useMemo(
     () => Array.from({ length: stats.lines }, (_, i) => i + 1),
