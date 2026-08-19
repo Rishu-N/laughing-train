@@ -239,6 +239,32 @@ const ICONS = {
       `<text x="16" y="21" font-family="monospace" font-size="11" font-weight="bold" text-anchor="middle" fill="#ffffff">2048</text>`,
   ),
   'about.svg': iconTile('#7b3fb8', 'i'),
+  // A speech bubble, not WhatsApp's mark — the same style-not-trademark rule
+  // that governs the Apple assets applies to every other company's logo too.
+  'whatsapp.svg': svg(
+    `<rect x="3" y="3" width="26" height="26" fill="#1f8a3c" stroke="#000"/>` +
+      `<path d="M8 9h16v11H15l-5 4v-4H8z" fill="#ffffff" stroke="#000" stroke-width="1"/>` +
+      `<g fill="#1f8a3c"><rect x="11" y="13" width="3" height="2"/><rect x="15" y="13" width="3" height="2"/><rect x="19" y="13" width="3" height="2"/></g>`,
+  ),
+  // A microphone, drawn at its real 32x32 render size.
+  'whisperflow.svg': svg(
+    `<rect x="3" y="3" width="26" height="26" fill="#2b3fd8" stroke="#000"/>` +
+      `<rect x="13" y="7" width="6" height="11" rx="3" fill="#ffffff" stroke="#000"/>` +
+      `<path d="M10 16a6 6 0 0 0 12 0" fill="none" stroke="#ffffff" stroke-width="2"/>` +
+      `<rect x="15" y="22" width="2" height="4" fill="#ffffff"/>` +
+      `<rect x="12" y="26" width="8" height="2" fill="#ffffff"/>`,
+  ),
+  // System 7 folder, with the downward arrow that marks it as Downloads.
+  'downloads.svg': svg(
+    `<path d="M3 8h10l2 3h14v18H3z" fill="#e0a021" stroke="#000" stroke-width="1"/>` +
+      `<path d="M16 15v7M13 19l3 3 3-3" fill="none" stroke="#000" stroke-width="2"/>`,
+  ),
+  // One archived export sitting inside that folder.
+  'archive.svg': svg(
+    `<rect x="6" y="3" width="20" height="26" fill="#dcdcdc" stroke="#000"/>` +
+      `<g fill="#8f8f8f"><rect x="14" y="4" width="4" height="3"/><rect x="14" y="9" width="4" height="3"/><rect x="14" y="14" width="4" height="3"/></g>` +
+      `<rect x="13" y="19" width="6" height="6" fill="#ffffff" stroke="#000"/>`,
+  ),
   'project.svg': iconTile('#4a4a4a', '{}'),
   'project-python.svg': iconTile('#3572a5', 'py'),
   'project-web.svg': iconTile('#e3690b', '&lt;/&gt;'),

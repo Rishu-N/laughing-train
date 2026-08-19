@@ -56,6 +56,12 @@ export const APP_ICONS = {
   snake: '/images/icons/snake.svg',
   g2048: '/images/icons/2048.svg',
   about: '/images/icons/about.svg',
+  whatsapp: '/images/icons/whatsapp.svg',
+  whisperflow: '/images/icons/whisperflow.svg',
+  /** The Downloads folder on the desktop, holding the sample chat exports. */
+  downloads: '/images/icons/downloads.svg',
+  /** A single file inside the Downloads folder window. */
+  archive: '/images/icons/archive.svg',
   /** Fallback for project apps whose language has no specific icon. */
   project: '/images/icons/project.svg',
   projectPython: '/images/icons/project-python.svg',
