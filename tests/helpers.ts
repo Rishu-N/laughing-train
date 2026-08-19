@@ -103,9 +103,16 @@ export async function registeredAppTitles(page: Page): Promise<string[]> {
   return titles.map((t) => t.trim()).filter(Boolean);
 }
 
-/** Close a window using its title-bar close box. */
+/**
+ * Close a window using its title-bar close box.
+ *
+ * Scoped to [data-window-control], the attribute Window.tsx puts on the three
+ * title-bar boxes. Matching on aria-label alone used to be enough, but an app
+ * is free to have a "Close …" control of its own — the WhatsApp Simulator has
+ * two, for its chat list — and those would make this ambiguous.
+ */
 export async function closeWindow(page: Page, win: Locator): Promise<void> {
-  await win.locator('button[aria-label^="Close "]').click();
+  await win.locator('button[data-window-control][aria-label^="Close "]').click();
   await expect(win).toHaveCount(0);
 }
 

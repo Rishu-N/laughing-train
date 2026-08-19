@@ -14,6 +14,9 @@ import { apps as terminalApps } from '@/lib/apps/terminal.apps';
 import { apps as projectApps } from '@/lib/apps/projects.apps';
 import { apps as gameApps } from '@/lib/apps/games.apps';
 import { apps as factsweeperApps } from '@/lib/apps/factsweeper.apps';
+import { apps as whatsappApps } from '@/lib/apps/whatsapp.apps';
+import { apps as downloadsApps } from '@/lib/apps/downloads.apps';
+import { apps as whisperflowApps } from '@/lib/apps/whisperflow.apps';
 import type { AppCategory, AppDefinition } from './types';
 
 /** The app opened automatically on boot. */
@@ -27,6 +30,9 @@ const ALL: AppDefinition[] = [
   ...projectApps,
   ...gameApps,
   ...factsweeperApps,
+  ...whatsappApps,
+  ...downloadsApps,
+  ...whisperflowApps,
 ];
 
 // Duplicate ids would make `open <app>` ambiguous and break dock identity. Fail
