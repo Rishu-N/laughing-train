@@ -32,8 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# `.env*` only matches names that START with .env, so a file called
+# secrets.env or prod.env would have sailed straight into a commit.
+*.env
 # ...but the template MUST be committed, or a fresh clone has nothing to copy
-# from and setup.sh has no key file to create.
+# from and setup.sh has no key file to create. It holds names, never values.
 !.env.example
 
 # vercel
@@ -49,3 +52,11 @@ next-env.d.ts
 # Playwright
 /test-results/
 /playwright-report/
+
+# Anything else that tends to carry a secret
+*.key
+*.p12
+id_rsa*
+
+# Local agent/editor tooling — machine-specific, not part of the project
+.claude/
