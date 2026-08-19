@@ -224,6 +224,52 @@ export const ICON_MACHINE: PixelMap = [
 ];
 
 /**
+ * The paint application. A framed picture rather than a brush, because at 16px
+ * a brush is an ambiguous diagonal smudge and a picture in a frame is not.
+ */
+export const ICON_PAINT: PixelMap = [
+  '................',
+  '.##############.',
+  '.#............#.',
+  '.#............#.',
+  '.#.....##.....#.',
+  '.#....####....#.',
+  '.#...##..##...#.',
+  '.#..##....##..#.',
+  '.#.##......##.#.',
+  '.##############.',
+  '.#..#..#..#...#.',
+  '.#....#..#....#.',
+  '.#............#.',
+  '.##############.',
+  '................',
+  '................',
+];
+
+/**
+ * The word processor. A page of ragged prose under a row of ruler ticks — the
+ * ticks are what keep it from reading as the Note Pad, whose lines are uniform.
+ */
+export const ICON_WRITE: PixelMap = [
+  '................',
+  '.##############.',
+  '.#............#.',
+  '.#.#.#.#.#.#..#.',
+  '.##############.',
+  '.#............#.',
+  '.#.##########.#.',
+  '.#............#.',
+  '.#.##########.#.',
+  '.#............#.',
+  '.#.#######....#.',
+  '.#............#.',
+  '.#.########...#.',
+  '.##############.',
+  '................',
+  '................',
+];
+
+/**
  * A horizontal run of black pixels: one <rect> instead of sixteen. Keeps the
  * SVG small enough that a screen full of icons costs nothing.
  */
