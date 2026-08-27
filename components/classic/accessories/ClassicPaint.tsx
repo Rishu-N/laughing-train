@@ -271,6 +271,51 @@ const TOOLS: readonly ToolDef[] = [
   { id: 'text', label: 'Text', glyph: G_TEXT, hint: 'Click, then type. Return sets it, Escape drops it.' },
 ];
 
+/**
+ * The three nibs, drawn as 9×9 bitmaps rather than as CSS.
+ *
+ * The round one used to be a `clip-path: circle(50%)` and the slash a rotated
+ * rectangle, and both of those are anti-aliased by the browser — which puts
+ * real grey pixels on a screen that has no grey. These are the shapes `stamp()`
+ * actually lays down at size 9, so the well now shows the nib rather than an
+ * approximation of it.
+ */
+const NIB_GLYPH: Record<BrushShape, PixelMap> = {
+  round: [
+    '..#####..',
+    '.#######.',
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+    '.#######.',
+    '..#####..',
+  ],
+  square: [
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+    '#########',
+  ],
+  slash: [
+    '........#',
+    '.......#.',
+    '......#..',
+    '.....#...',
+    '....#....',
+    '...#.....',
+    '..#......',
+    '.#.......',
+    '#........',
+  ],
+};
+
 /** Type size follows the line-weight well — a thicker nib writes bigger. */
 const TEXT_SIZES = [8, 12, 16, 24];
 
@@ -317,6 +362,23 @@ export default function ClassicPaint() {
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const textWidthRef = useRef(0);
   const loadedRef = useRef(false);
+  /**
+   * An undo frame that has been armed but not filed.
+   *
+   * A shape tool and a marquee grab both take a copy on pointer-down and may
+   * then never touch a pixel, because a click is not a drag. Filing the frame
+   * anyway pads the stack with entries that undo to the state they were taken
+   * in — an undo stack you can inflate with misclicks is not twenty-four deep,
+   * it only says it is. So the copy waits here until something actually moves.
+   *
+   * The marquee needs it for a second reason: by the time it starts dragging,
+   * `baseRef` holds the canvas with the selection *lifted out*, which is not a
+   * state anybody wants to land on. The frame has to be the bitmap as it stood
+   * before the grab, and this is where that is kept.
+   */
+  const pendingRef = useRef<Bitmap | null>(null);
+  /** True between placing a text caret and the caret actually taking focus. */
+  const placingRef = useRef(false);
   /** Resolved at runtime: next/font generates the family name, we can't spell it. */
   const fontRef = useRef('monospace');
 
@@ -367,7 +429,16 @@ export default function ClassicPaint() {
     setUndoDepth(undoRef.current.frames.length);
   }, []);
 
-  const undo = useCallback(() => {
+  /** File the armed frame, if the gesture turned out to change anything. */
+  const fileSnapshot = useCallback(() => {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    pendingRef.current = null;
+    undoRef.current = pushFrame(undoRef.current, pending);
+    setUndoDepth(undoRef.current.frames.length);
+  }, []);
+
+  const undoRaw = useCallback(() => {
     const popped = popFrame(undoRef.current);
     if (!popped) return;
     undoRef.current = popped.stack;
@@ -464,6 +535,25 @@ export default function ClassicPaint() {
     repaint();
   }, [repaint]);
 
+  /**
+   * Undo, with a live text caret taken into account first.
+   *
+   * A caret is a gesture in progress, not a finished edit: every keystroke
+   * re-renders the canvas from `baseRef`, and none of it has reached the stack
+   * yet. Popping a frame underneath one would restore a bitmap that the very
+   * next keystroke overwrites from a base that no longer matches — and the
+   * frame would be spent. So the first Undo abandons the caret, which is what
+   * "undo what I am doing" means while you are still doing it, and the next one
+   * reaches the stack proper.
+   */
+  const undo = useCallback(() => {
+    if (textAt) {
+      cancelText();
+      return;
+    }
+    undoRaw();
+  }, [textAt, cancelText, undoRaw]);
+
   /* ------------------------------------------------------------ pointer ---- */
 
   const pointAt = (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -478,11 +568,25 @@ export default function ClassicPaint() {
     if (tool === 'text') {
       // A live caret in the canvas, not a dialog. Everything typed re-renders
       // from the pre-caret snapshot, so the preview is the committed result.
+      //
+      // preventDefault is load-bearing, not tidiness: without it the pointer
+      // press goes on to move focus off the hidden input, the input's blur
+      // handler commits — and commits *the caret placed a moment ago on this
+      // very click*, which it sees as empty and therefore throws away. The
+      // result was that the first click placed a caret and every click after it
+      // silently cancelled one. Suppressing the compatibility mouse event stops
+      // the focus moving at all; placingRef covers any engine that fires the
+      // blur regardless.
+      e.preventDefault();
       commitText();
       baseRef.current = cloneBitmap(bmpRef.current);
+      placingRef.current = true;
       setTextAt(p);
       setTextValue('');
-      window.setTimeout(() => textInputRef.current?.focus({ preventScroll: true }), 0);
+      window.setTimeout(() => {
+        textInputRef.current?.focus({ preventScroll: true });
+        placingRef.current = false;
+      }, 0);
       return;
     }
 
@@ -505,7 +609,9 @@ export default function ClassicPaint() {
         p.y >= sel.y &&
         p.y < sel.y + sel.h;
       if (inside && sel) {
-        snapshot();
+        // Armed, not filed: see pendingRef. The frame is the canvas with the
+        // selection still in place, taken before it is lifted out below.
+        pendingRef.current = cloneBitmap(bmpRef.current);
         const region = copyRegion(bmpRef.current, sel);
         baseRef.current = cloneBitmap(bmpRef.current);
         eraseRegion(baseRef.current, sel);
@@ -518,9 +624,8 @@ export default function ClassicPaint() {
       return;
     }
 
-    snapshot();
-
     if (tool === 'pencil') {
+      snapshot();
       const value = pencilValue(bmpRef.current, p.x, p.y);
       strokePencil(bmpRef.current, p.x, p.y, p.x, p.y, value);
       dragRef.current = { kind: 'freehand', last: p, ink: value };
@@ -529,6 +634,7 @@ export default function ClassicPaint() {
     }
 
     if (tool === 'brush' || tool === 'eraser') {
+      snapshot();
       const nib = tool === 'eraser' ? WHITE_INK : pattern;
       const size = tool === 'eraser' ? weight * 3 + 2 : weight;
       const shape: BrushShape = tool === 'eraser' ? 'square' : brush;
@@ -539,6 +645,7 @@ export default function ClassicPaint() {
     }
 
     baseRef.current = cloneBitmap(bmpRef.current);
+    pendingRef.current = cloneBitmap(bmpRef.current);
     dragRef.current = { kind: 'shape', start: p };
   };
 
@@ -568,6 +675,7 @@ export default function ClassicPaint() {
     }
 
     if (drag.kind === 'move') {
+      fileSnapshot();
       const dx = p.x - drag.grab.x;
       const dy = p.y - drag.grab.y;
       bmpRef.current = cloneBitmap(baseRef.current);
@@ -584,6 +692,7 @@ export default function ClassicPaint() {
 
     // Rubber band: redraw the shape from the pre-drag copy every move, which is
     // the only way to preview a shape that has not been committed yet.
+    fileSnapshot();
     const rect = normalizeRect(drag.start.x, drag.start.y, p.x, p.y);
     bmpRef.current = cloneBitmap(baseRef.current);
     switch (tool) {
@@ -612,6 +721,9 @@ export default function ClassicPaint() {
     if (!dragRef.current) return;
     const wasSelect = dragRef.current.kind === 'select';
     dragRef.current = null;
+    // Never moved, so nothing was drawn and the armed frame is discarded rather
+    // than filed. A click that changes no pixel must not cost an Undo.
+    pendingRef.current = null;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
@@ -704,7 +816,13 @@ export default function ClassicPaint() {
               aria-label="Text to place on the canvas"
               data-testid="paint-text-entry"
               onChange={(e) => setTextValue(e.target.value)}
-              onBlur={commitText}
+              onBlur={() => {
+                // A blur raised by the click that just placed this caret is
+                // not the visitor walking away from it; committing there would
+                // cancel the caret on the way in. See onPointerDown.
+                if (placingRef.current) return;
+                commitText();
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === 'Escape') {
                   e.preventDefault();
@@ -752,23 +870,15 @@ export default function ClassicPaint() {
               type="button"
               aria-label={`${shape} brush`}
               aria-pressed={i === brushIndex}
+              data-testid={`paint-brush-${shape}`}
               onClick={() => setBrushIndex(i)}
               className={[
                 'flex h-[16px] w-[16px] cursor-default items-center justify-center border-r border-black last:border-r-0',
                 'focus-visible:shadow-[inset_0_0_0_2px_#000] focus-visible:outline-none',
-                i === brushIndex ? 'bg-black' : 'bg-white',
+                i === brushIndex ? 'bg-black text-white' : 'bg-white text-black',
               ].join(' ')}
             >
-              <span
-                className={i === brushIndex ? 'bg-white' : 'bg-black'}
-                style={
-                  shape === 'round'
-                    ? { height: 8, width: 8, borderRadius: 0, clipPath: 'circle(50%)' }
-                    : shape === 'square'
-                      ? { height: 8, width: 8 }
-                      : { height: 10, width: 2, transform: 'rotate(45deg)' }
-                }
-              />
+              <PixelIcon map={NIB_GLYPH[shape]} size={9} />
             </button>
           ))}
         </Well>

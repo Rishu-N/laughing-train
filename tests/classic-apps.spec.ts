@@ -12,6 +12,7 @@
  * before any window is driven.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { boot, openAppFromMenu } from './helpers';
 
 /**
  * These specs navigate more than most, and the dev server compiles routes on
@@ -235,5 +236,61 @@ test.describe('the 1984 applications', () => {
     await page.getByRole('button', { name: 'New', exact: true }).click();
     await page.getByTestId('write-new-confirm').click();
     await expect(page.getByTestId('write-editor')).not.toContainText('Persisted sentence');
+  });
+});
+
+/**
+ * Both word processors reapply their saved document by assigning innerHTML, and
+ * localStorage is writable by anything that ever runs on this origin — so "this
+ * app wrote it" is not the same claim as "this is what the app wrote".
+ *
+ * These two tests plant a hostile document under each app's storage key and
+ * assert it comes back inert. They are the reason lib/richtext/sanitize.ts
+ * exists in one copy rather than two.
+ */
+test.describe('a tampered stored document cannot execute', () => {
+  /** Script tag, inline handler, and a style that would fetch. */
+  const HOSTILE =
+    '<img src=x onerror="window.__pwned=1">' +
+    '<script>window.__pwned=1<\/script>' +
+    '<b onclick="window.__pwned=1" style="background:url(http://example.com/x.png)">kept text</b>';
+
+  /** Seed a session document before the app that owns it ever mounts. */
+  async function plant(page: Page, appId: string) {
+    await page.addInitScript(
+      ([key, html]) => {
+        window.localStorage.setItem(key, JSON.stringify({ html, text: '' }));
+      },
+      [`os90:v1:${appId}`, HOSTILE] as const,
+    );
+  }
+
+  test('BitWrite, in the 1984 shell', async ({ page }) => {
+    await plant(page, 'classic-write');
+    await classicDesktop(page);
+    await launch(page, 'BitWrite');
+
+    const editor = page.getByTestId('write-editor');
+    await expect(editor).toBeVisible();
+    // The words survive — stripping a tag should not take the sentence with it.
+    await expect(editor).toContainText('kept text');
+
+    await expect(editor.locator('script')).toHaveCount(0);
+    await expect(editor.locator('[onerror], [onclick]')).toHaveCount(0);
+    expect(await page.evaluate(() => '__pwned' in window)).toBe(false);
+  });
+
+  test('Word, in the colour OS', async ({ page }) => {
+    await plant(page, 'word');
+    await boot(page);
+    await openAppFromMenu(page, 'Word');
+
+    const editor = page.locator('[contenteditable="true"]').first();
+    await expect(editor).toBeVisible();
+    await expect(editor).toContainText('kept text');
+
+    await expect(editor.locator('script')).toHaveCount(0);
+    await expect(editor.locator('[onerror], [onclick]')).toHaveCount(0);
+    expect(await page.evaluate(() => '__pwned' in window)).toBe(false);
   });
 });

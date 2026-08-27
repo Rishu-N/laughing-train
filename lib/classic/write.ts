@@ -260,54 +260,13 @@ export function preferCssStyling(): void {
  * The saved document is reapplied by assigning `innerHTML` — there is no
  * `dangerouslySetInnerHTML` anywhere in this repo and there is not going to be
  * — and localStorage is writable by anything else that ever runs on this
- * origin, so what comes back is not trusted just because we wrote it. Parsing
- * into a detached `<template>` means nothing is ever live in the document:
- * scripts do not execute and images do not fetch inside one.
+ * origin, so what comes back is not trusted just because we wrote it.
+ *
+ * This used to be implemented here, which meant the colour OS's word processor
+ * (which has the same problem) either had to import out of the 1984 shell or
+ * keep a second, weaker copy. It kept the second copy. The scrubber now lives
+ * in `lib/richtext/sanitize.ts`, below both shells and belonging to neither —
+ * see the note at the top of that file — and BitWrite goes on importing it
+ * from here, so nothing in this shell has heard of the other one.
  */
-const ALLOWED_TAGS = new Set([
-  'B',
-  'STRONG',
-  'I',
-  'EM',
-  'U',
-  'BR',
-  'DIV',
-  'P',
-  'SPAN',
-  'FONT',
-  'UL',
-  'OL',
-  'LI',
-]);
-
-const UNSAFE_STYLE = /(url\s*\(|expression\s*\(|javascript:|@import|behaviou?r\s*:)/i;
-
-export function sanitizeStoredHtml(html: string): string {
-  if (typeof document === 'undefined') return '';
-  const template = document.createElement('template');
-  template.innerHTML = html;
-
-  const walk = (node: ParentNode): void => {
-    for (const child of Array.from(node.children)) {
-      walk(child);
-      if (!ALLOWED_TAGS.has(child.tagName)) {
-        // Keep the words, drop the element — a stripped <script> should not
-        // take a paragraph of the visitor's writing with it.
-        child.replaceWith(...Array.from(child.childNodes));
-        continue;
-      }
-      for (const attr of Array.from(child.attributes)) {
-        const name = attr.name.toLowerCase();
-        const keep =
-          (name === 'style' && !UNSAFE_STYLE.test(attr.value)) ||
-          (name === 'align' && child.tagName !== 'SCRIPT') ||
-          (name === 'size' && child.tagName === 'FONT') ||
-          (name === 'face' && child.tagName === 'FONT');
-        if (!keep) child.removeAttribute(attr.name);
-      }
-    }
-  };
-  walk(template.content);
-
-  return template.innerHTML;
-}
+export { sanitizeStoredHtml } from '@/lib/richtext/sanitize';

@@ -11,6 +11,17 @@
  * rewriting this file and nothing else.
  */
 
+/**
+ * Re-exported, not reimplemented. The stored document is put back by assigning
+ * `innerHTML`, and localStorage is writable by anything that ever runs on this
+ * origin, so it gets scrubbed on the way in. The scrubber itself sits in
+ * `lib/richtext/sanitize.ts` — below both shells, imported by neither's UI —
+ * because the 1984 shell needs exactly the same thing and a second copy is how
+ * this repo ended up with two standards for one risk. Word imports it from
+ * here so the "all rich-text plumbing is in this file" rule still holds.
+ */
+export { sanitizeStoredHtml } from '@/lib/richtext/sanitize';
+
 export type RichCommand =
   | 'bold'
   | 'italic'

@@ -29,6 +29,7 @@ import {
   isActive,
   preferCssStyling,
   runCommand,
+  sanitizeStoredHtml,
   type Alignment,
   type RichCommand,
 } from './richText';
@@ -78,14 +79,20 @@ export default function WordApp({ setTitle }: AppWindowProps) {
 
   /* Apply the persisted document once, imperatively. React cannot own the
      children of a contenteditable without fighting the caret, and this keeps us
-     clear of dangerouslySetInnerHTML — the only HTML written here is HTML this
-     app itself serialised from its own editor. */
+     clear of dangerouslySetInnerHTML.
+
+     It is scrubbed on the way in. This app wrote the HTML, but localStorage is
+     writable by anything that ever runs on this origin, so "we serialised it"
+     is not the same claim as "it is what we serialised" — and an assignment to
+     innerHTML is the one place on this desktop where the difference would
+     matter. sanitizeStoredHtml parses it inside an inert <template>, where
+     nothing executes and nothing fetches, and keeps only an allowlist. */
   useEffect(() => {
     if (!hydrated || appliedRef.current) return;
     appliedRef.current = true;
     const el = editorRef.current;
     if (!el) return;
-    el.innerHTML = doc.html;
+    el.innerHTML = sanitizeStoredHtml(doc.html);
     preferCssStyling();
     recount();
   }, [hydrated, doc.html, recount]);

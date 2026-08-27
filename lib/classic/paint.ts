@@ -231,6 +231,11 @@ function ink(bmp: Bitmap, x: number, y: number, pattern: PaintPattern): void {
  * One dab of a brush. `size` is the diameter; odd sizes centre exactly and even
  * ones lean up-left, which is what a 1-bit machine did too — there is no half
  * pixel to split the difference into.
+ *
+ * The lean is the whole reason `lo`/`hi` are worked out rather than looping
+ * `-half..half`: that range is `size | 1` pixels wide, so a 2px nib and a 3px
+ * nib laid down the identical 3×3 dab and two of the four buttons in the
+ * line-weight well drew exactly the same line.
  */
 export function stamp(
   bmp: Bitmap,
@@ -240,21 +245,28 @@ export function stamp(
   size: number,
   pattern: PaintPattern,
 ): void {
-  const half = Math.floor(size / 2);
   if (size <= 1) {
     ink(bmp, cx, cy, pattern);
     return;
   }
+  const lo = -Math.floor(size / 2);
+  const hi = lo + size - 1;
+
   if (shape === 'slash') {
     // A calligraphic nib: a 45° bar, so horizontal strokes read heavy and
     // vertical ones read light.
-    for (let i = 0; i < size; i += 1) ink(bmp, cx - half + i, cy + half - i, pattern);
+    for (let i = 0; i < size; i += 1) ink(bmp, cx + lo + i, cy + hi - i, pattern);
     return;
   }
-  const r = size / 2;
-  for (let dy = -half; dy <= half; dy += 1) {
-    for (let dx = -half; dx <= half; dx += 1) {
-      if (shape === 'round' && dx * dx + dy * dy > r * r) continue;
+  // Measured from the dab's own centre, which sits on a half pixel when the
+  // size is even. The quarter-pixel trim is what stops a "round" 3 and a
+  // "round" 5 from rasterising as plain squares — at these sizes the corner is
+  // exactly on the circle and has to be argued off it.
+  const c = (lo + hi) / 2;
+  const r = size / 2 - 0.25;
+  for (let dy = lo; dy <= hi; dy += 1) {
+    for (let dx = lo; dx <= hi; dx += 1) {
+      if (shape === 'round' && (dx - c) ** 2 + (dy - c) ** 2 > r * r) continue;
       ink(bmp, cx + dx, cy + dy, pattern);
     }
   }
