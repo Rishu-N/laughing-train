@@ -22,18 +22,27 @@ export interface PdfExportParams {
   mediaBlobs: Map<string, Blob>;
   showTimestamps: boolean;
   showSenderName: boolean;
+  showSystem?: boolean;
   onProgress?: (page: number, total: number) => void;
   cancelToken?: CancelToken;
 }
 
 /** Runs layout only — used by the export dialog to show an estimated
  * page count before the user commits to a (potentially slow) export. */
-export function estimatePdfPageCount(model: ChatModel, start: number, end: number, meId: number, showSenderName: boolean): number {
+export function estimatePdfPageCount(
+  model: ChatModel,
+  start: number,
+  end: number,
+  meId: number,
+  showSenderName: boolean,
+  showSystem?: boolean,
+): number {
   const contentWidthPx = (PT.A4W - PT.MARGIN * 2) * SCALE;
   const layout = measureLayout(model, start, end, meId, {
     contentWidth: contentWidthPx,
     showTimestamps: true,
     showSenderName,
+    showSystem,
     images: new Map(),
   });
   const perPagePx = (PT.A4H - PT.MARGIN * 2 - PT.HEADER_H) * SCALE;
@@ -41,7 +50,8 @@ export function estimatePdfPageCount(model: ChatModel, start: number, end: numbe
 }
 
 export async function exportPdf(params: PdfExportParams): Promise<void> {
-  const { model, start, end, meId, contactName, mediaBlobs, showTimestamps, showSenderName, onProgress, cancelToken } = params;
+  const { model, start, end, meId, contactName, mediaBlobs, showTimestamps, showSenderName, showSystem, onProgress, cancelToken } =
+    params;
 
   const [{ PDFDocument, StandardFonts, rgb }, images] = await Promise.all([
     import("pdf-lib"),
@@ -50,7 +60,7 @@ export async function exportPdf(params: PdfExportParams): Promise<void> {
   checkCancelled(cancelToken);
 
   const contentWidthPx = (PT.A4W - PT.MARGIN * 2) * SCALE;
-  const opts: LayoutOptions = { contentWidth: contentWidthPx, showTimestamps, showSenderName, images };
+  const opts: LayoutOptions = { contentWidth: contentWidthPx, showTimestamps, showSenderName, showSystem, images };
   const layout = measureLayout(model, start, end, meId, opts);
 
   const perPagePx = (PT.A4H - PT.MARGIN * 2 - PT.HEADER_H) * SCALE;

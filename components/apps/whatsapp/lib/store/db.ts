@@ -69,8 +69,46 @@ function getDb() {
 /** Reads `rawTexts`, tolerating records saved before this field existed
  * (which had a single `rawText: string` instead). */
 function readRawTexts(rec: ChatRecord & { rawText?: string }): string[] {
-  if (Array.isArray(rec.rawTexts)) return rec.rawTexts;
-  return rec.rawText ? [rec.rawText] : [];
+  if (Array.isArray(rec.rawTexts)) return rec.rawTexts.filter((t) => typeof t === "string");
+  return typeof rec.rawText === "string" && rec.rawText ? [rec.rawText] : [];
+}
+
+function num(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+/**
+ * Coerces whatever actually came out of IndexedDB into a record the UI can
+ * render.
+ *
+ * The store is not a fresh database every visit — it holds records written by
+ * older builds, and records whose write was interrupted by a closed tab
+ * mid-transaction. There is no error boundary between a row in the chat list
+ * and the whole operating system, so a single missing `messageCount` would
+ * throw inside `toLocaleString()` during render and take the desktop down with
+ * it — permanently, since the same record is read again on every reload. That
+ * failure mode is why every field is defaulted here rather than at each of the
+ * dozen places that reads one.
+ */
+function normalize(rec: unknown): ChatRecord | null {
+  if (!rec || typeof rec !== "object") return null;
+  const r = rec as ChatRecord & { rawText?: string };
+  if (typeof r.id !== "string" || r.id === "") return null;
+  const now = Date.now();
+  return {
+    id: r.id,
+    name: typeof r.name === "string" && r.name ? r.name : "Untitled chat",
+    rawTexts: readRawTexts(r),
+    createdAt: num(r.createdAt, now),
+    lastOpenedAt: num(r.lastOpenedAt, num(r.createdAt, now)),
+    messageCount: num(r.messageCount, 0),
+    senders: Array.isArray(r.senders) ? r.senders.filter((s) => typeof s === "string") : [],
+    firstTs: num(r.firstTs, 0),
+    lastTs: num(r.lastTs, 0),
+    lastPreview: typeof r.lastPreview === "string" ? r.lastPreview : "",
+    meId: num(r.meId, 0),
+    dateOrderOverride: r.dateOrderOverride === "DMY" || r.dateOrderOverride === "MDY" ? r.dateOrderOverride : undefined,
+  };
 }
 
 export async function saveChat(chat: ChatRecord): Promise<void> {
@@ -81,15 +119,18 @@ export async function saveChat(chat: ChatRecord): Promise<void> {
 export async function listChats(): Promise<ChatRecord[]> {
   const db = await getDb();
   const all = await db.getAll("chats");
-  for (const rec of all) rec.rawTexts = readRawTexts(rec);
-  return all.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+  // A record too broken to have an id is dropped rather than repaired —
+  // there is nothing to open it by, so showing it would only offer the
+  // visitor a row that does nothing.
+  return all
+    .map(normalize)
+    .filter((r): r is ChatRecord => r !== null)
+    .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
 }
 
 export async function getChat(id: string): Promise<ChatRecord | undefined> {
   const db = await getDb();
-  const rec = await db.get("chats", id);
-  if (rec) rec.rawTexts = readRawTexts(rec);
-  return rec;
+  return normalize(await db.get("chats", id)) ?? undefined;
 }
 
 export async function touchChat(id: string): Promise<void> {

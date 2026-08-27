@@ -29,6 +29,7 @@ export interface PngExportParams {
   mediaBlobs: Map<string, Blob>;
   showTimestamps: boolean;
   showSenderName: boolean;
+  showSystem?: boolean;
   onProgress?: (chunk: number, total: number) => void;
   cancelToken?: CancelToken;
 }
@@ -54,12 +55,13 @@ function findCutAtOrBefore(layout: Layout, target: number): number {
 }
 
 export async function exportPng(params: PngExportParams): Promise<void> {
-  const { model, start, end, meId, contactName, mediaBlobs, showTimestamps, showSenderName, onProgress, cancelToken } = params;
+  const { model, start, end, meId, contactName, mediaBlobs, showTimestamps, showSenderName, showSystem, onProgress, cancelToken } =
+    params;
 
   const images = await preloadImages(model, start, end, mediaBlobs);
   checkCancelled(cancelToken);
 
-  const opts: LayoutOptions = { contentWidth: CONTENT_WIDTH, showTimestamps, showSenderName, images };
+  const opts: LayoutOptions = { contentWidth: CONTENT_WIDTH, showTimestamps, showSenderName, showSystem, images };
   const layout = measureLayout(model, start, end, meId, opts);
 
   const dateRange =

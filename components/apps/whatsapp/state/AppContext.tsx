@@ -162,7 +162,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [activeChatId]);
 
   useEffect(() => {
-    db.listChats().then(setChats);
+    // Storage can be unavailable outright — a blocked upgrade, a private
+    // window with no quota. An empty history is still a usable app; an
+    // unhandled rejection on mount is just a silent one.
+    db.listChats()
+      .then(setChats)
+      .catch((err) => setImportError(err instanceof Error ? err.message : String(err)));
   }, []);
 
   // The theme used to be written onto <html>. Inside the OS that would repaint

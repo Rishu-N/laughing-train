@@ -6,7 +6,7 @@
 // nears the bottom) rather than measuring/recycling DOM nodes — simpler
 // and more portable, and the export is already scoped to whatever range
 // the user filtered to before sharing.
-import { Flag, type ChatModel } from "../model";
+import { Flag, MsgType, type ChatModel } from "../model";
 import { checkCancelled, downloadBlob, safeFileStem, type CancelToken } from "./shared";
 
 export interface HtmlExportParams {
@@ -18,6 +18,7 @@ export interface HtmlExportParams {
   mediaBlobs: Map<string, Blob>;
   showTimestamps: boolean;
   showSenderName: boolean;
+  showSystem?: boolean;
   onProgress?: (done: number, total: number) => void;
   cancelToken?: CancelToken;
 }
@@ -56,13 +57,23 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export async function exportHtml(params: HtmlExportParams): Promise<void> {
-  const { model, start, end, meId, contactName, mediaBlobs, showTimestamps, showSenderName, onProgress, cancelToken } =
+  const { model, start, end, meId, contactName, mediaBlobs, showTimestamps, showSenderName, showSystem, onProgress, cancelToken } =
     params;
+
+  // The rows that actually make it into the file. Everything below reads from
+  // this list rather than slicing the columns straight through, because the
+  // "show system messages" switch punches holes in an otherwise contiguous
+  // range — and the exported document is meant to be the one on screen.
+  const indices: number[] = [];
+  for (let i = start; i < end; i++) {
+    if (showSystem === false && model.type[i] === MsgType.SYSTEM) continue;
+    indices.push(i);
+  }
 
   const mediaData: Record<string, string> = {};
   const keys: string[] = [];
   const seen = new Set<string>();
-  for (let i = start; i < end; i++) {
+  for (const i of indices) {
     if ((model.flags[i] & Flag.HAS_FILE) === 0) continue;
     const key = model.mediaKey[i];
     if (key && !seen.has(key) && mediaBlobs.has(key)) {
@@ -79,8 +90,10 @@ export async function exportHtml(params: HtmlExportParams): Promise<void> {
   }
 
   const dateRange =
-    end > start
-      ? `${new Date(model.ts[start]).toLocaleDateString()} – ${new Date(model.ts[end - 1]).toLocaleDateString()}`
+    indices.length > 0
+      ? `${new Date(model.ts[indices[0]]).toLocaleDateString()} – ${new Date(
+          model.ts[indices[indices.length - 1]],
+        ).toLocaleDateString()}`
       : "";
 
   const payload = {
@@ -90,12 +103,12 @@ export async function exportHtml(params: HtmlExportParams): Promise<void> {
     senders: model.senders,
     showTimestamps,
     showSenderName,
-    ts: Array.from(model.ts.subarray(start, end)),
-    senderId: Array.from(model.senderId.subarray(start, end)),
-    type: Array.from(model.type.subarray(start, end)),
-    flags: Array.from(model.flags.subarray(start, end)),
-    bodies: model.bodies.slice(start, end),
-    mediaKey: model.mediaKey.slice(start, end),
+    ts: indices.map((i) => model.ts[i]),
+    senderId: indices.map((i) => model.senderId[i]),
+    type: indices.map((i) => model.type[i]),
+    flags: indices.map((i) => model.flags[i]),
+    bodies: indices.map((i) => model.bodies[i]),
+    mediaKey: indices.map((i) => model.mediaKey[i]),
     media: mediaData,
   };
 

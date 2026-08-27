@@ -63,12 +63,12 @@ function ExportSheet({ onClose }: { onClose: () => void }) {
   const estimate = useMemo(() => {
     if (count === 0) return null;
     if (format === "pdf") {
-      const pages = estimatePdfPageCount(app.model, start, end, app.meId, isGroup);
+      const pages = estimatePdfPageCount(app.model, start, end, app.meId, isGroup, app.settings.showSystem);
       return `${pages.toLocaleString()} page${pages === 1 ? "" : "s"}`;
     }
     if (format === "html") return `~${formatBytes(htmlBytes)}`;
     return null;
-  }, [format, app.model, start, end, app.meId, isGroup, count, htmlBytes]);
+  }, [format, app.model, start, end, app.meId, isGroup, count, htmlBytes, app.settings.showSystem]);
 
   const sizeWarning = format === "html" && htmlBytes > 50 * 1024 * 1024;
 
@@ -85,6 +85,9 @@ function ExportSheet({ onClose }: { onClose: () => void }) {
       mediaBlobs: app.mediaBlobs,
       showTimestamps: app.settings.showTimestamps,
       showSenderName: isGroup,
+      // The export is the document you were just looking at, so it obeys the
+      // same Settings switch the live chat does.
+      showSystem: app.settings.showSystem,
       cancelToken: cancelRef.current,
       onProgress: (d: number, t: number) => setProgress({ done: d, total: t }),
     };

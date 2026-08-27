@@ -45,6 +45,11 @@ export interface LayoutOptions {
   contentWidth: number;
   showTimestamps: boolean;
   showSenderName: boolean;
+  /** Mirrors the same switch in Settings. An export is meant to be the
+   * document you were just looking at, so a reader who turned the
+   * encryption notices off should not find them back in the PDF.
+   * Defaults to showing them, which is what the live chat does. */
+  showSystem?: boolean;
   /** Resolved real images, keyed by the model's mediaKey — only IMAGE
    * and file-backed STICKER rows need one; everything else (video,
    * audio, documents, contacts) always renders as a placeholder tile
@@ -139,6 +144,10 @@ export function measureLayout(
   for (let i = start; i < end; i++) {
     const type = model.type[i] as MsgType;
     const ts = model.ts[i];
+
+    // Skipped before the divider check, which system rows never trigger
+    // anyway — so dropping them can't leave a day without its heading.
+    if (type === MsgType.SYSTEM && opts.showSystem === false) continue;
 
     if (type !== MsgType.SYSTEM) {
       const day = startOfDay(ts);
