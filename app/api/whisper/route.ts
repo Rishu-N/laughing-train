@@ -21,8 +21,26 @@
  *     tests/offline.spec.ts — "the page makes no cross-origin requests at all" —
  *     true even with a key configured, exactly as /api/terminal does.
  *
- * Only the two 400s are real errors, and both mean the request was malformed or
- * oversized before any transcription was attempted. Neither is a crash.
+ * Only the 400s are real errors, and all of them mean the request was malformed
+ * or oversized before any transcription was attempted. None is a crash.
+ *
+ * ── The risk this route carries ─────────────────────────────────────────────
+ *
+ * There is NO authentication here, and that is a stated risk rather than an
+ * oversight. Anyone who can reach a deployed instance can spend the owner's
+ * OpenAI credits. Everything below is a COST BOUND, not access control:
+ *
+ *   - a take is capped at MAX_SECONDS, enforced as the bytes such a take can
+ *     occupy, so no single request can bill twenty minutes of audio;
+ *   - a per-IP token bucket, plus a global one, so a client rotating through
+ *     addresses still meets a ceiling rather than only slowing itself down.
+ *
+ * Both buckets live in this process: they reset on redeploy and do not
+ * coordinate across instances, and the IP behind them comes from
+ * x-forwarded-for, which is worth exactly as much as the proxy that sets it —
+ * i.e. nothing at all if the route is reachable directly. The only mitigation
+ * that genuinely holds is a hard spend limit on the OpenAI account itself. See
+ * the OPENAI_API_KEY block in .env.example; do not deploy a key without one.
  *
  * OWNER: WhisperFlow agent.
  */
@@ -32,19 +50,53 @@ export const runtime = 'nodejs';
 /* --------------------------------------------------------------- limits --- */
 
 /**
- * Hard ceiling on an upload. Audio is orders of magnitude bigger than the
- * terminal's 2 KB of text, so this needs a real number: 8 MB is roughly 20
- * minutes of Opus at the bitrate MediaRecorder picks, well under OpenAI's own
- * 25 MB limit, and small enough that a hostile client cannot park a gigabyte in
- * this process's memory while formData() buffers it.
+ * Longest single take. The client reads this from GET and stops its recorder
+ * there; the server holds itself to the same number via MAX_AUDIO_BYTES below,
+ * so the limit GET advertises is one the server actually enforces.
  */
-const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
+const MAX_SECONDS = 60;
+
+/**
+ * The most a second of audio may plausibly occupy. Chromium's MediaRecorder
+ * emits mono Opus at roughly 32–48 kbps (4–6 KB/s) and Safari's AAC lands in the
+ * same range, so 48 KB/s leaves about eight times the headroom a real recording
+ * needs.
+ */
+const MAX_BYTES_PER_SECOND = 48 * 1024;
+
+/**
+ * Hard ceiling on an upload — DERIVED from the duration limit rather than picked
+ * independently, because duration is not something this route can measure.
+ * Knowing a take's real length means decoding the container, and there is no
+ * decoder here and no dependency budget for one. Bytes are the only
+ * duration-shaped bound a route in this shape can enforce honestly, so the two
+ * numbers are kept in step by construction and GET reports both.
+ *
+ * That matters for money, not just memory. The previous flat 8 MB was roughly
+ * twenty minutes of Opus, and Whisper bills by the minute of audio, so one
+ * request could cost twenty times what the app's own 60-second take can. ~2.8 MB
+ * now, still far under OpenAI's 25 MB limit, and still small enough that a
+ * hostile client cannot park a gigabyte in this process while formData() buffers
+ * it.
+ */
+const MAX_AUDIO_BYTES = MAX_SECONDS * MAX_BYTES_PER_SECOND;
+/** Slack for the multipart wrapper when judging a request by its declared length. */
+const MULTIPART_OVERHEAD_BYTES = 8 * 1024;
 /** Below this there is no speech in there — a mis-click, not a dictation. */
 const MIN_AUDIO_BYTES = 1_200;
-/** Longest single take the client should offer. Reported by GET so both agree. */
-const MAX_SECONDS = 60;
-/** Token bucket: this many transcriptions per IP per minute, burstable. */
-const RATE_LIMIT = 12;
+/**
+ * Token bucket: this many transcriptions per IP per minute, burstable. Eight is
+ * far more than a person dictating into a demo will ever want and a poor rate at
+ * which to mine someone else's credits.
+ */
+const RATE_LIMIT = 8;
+/**
+ * And this many per minute across ALL callers. The per-IP bucket alone is only a
+ * speed bump for anything with more than one address; this is the number that
+ * bounds the bill, and it is deliberately loose enough that a real audience
+ * never notices it.
+ */
+const GLOBAL_LIMIT = 60;
 const RATE_WINDOW_MS = 60_000;
 /** Give up on the model rather than hold the microphone hostage. */
 const UPSTREAM_TIMEOUT_MS = 30_000;
@@ -65,11 +117,17 @@ interface Bucket {
 }
 
 /**
- * In-memory, per-instance token bucket — the same one the terminal route uses,
- * for the same reason: this is a portfolio site, not a bank. It resets on
- * redeploy and does not coordinate across instances.
+ * In-memory, per-instance token buckets — the same mechanism the terminal route
+ * uses, for the same reason: this is a portfolio site, not a bank. They reset on
+ * redeploy and do not coordinate across instances, which is why the header
+ * comment names the OpenAI spend limit as the real guard rather than these.
+ *
+ * Two buckets share the map: one per client IP, and one for everybody at once.
  */
 const buckets = new Map<string, Bucket>();
+
+/** The everyone-at-once bucket. No IP can collide with it — an IP has no spaces. */
+const GLOBAL_KEY = 'all callers';
 
 function clientIp(req: Request): string {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -80,29 +138,45 @@ function clientIp(req: Request): string {
   return req.headers.get('x-real-ip')?.trim() || 'local';
 }
 
-function allow(ip: string): boolean {
+/** Refill a bucket to now, creating it full if this is its first request. */
+function refill(key: string, limit: number, now: number): Bucket {
+  const existing = buckets.get(key);
+  if (!existing) {
+    const fresh: Bucket = { tokens: limit, last: now };
+    buckets.set(key, fresh);
+    return fresh;
+  }
+  existing.tokens = Math.min(limit, existing.tokens + ((now - existing.last) / RATE_WINDOW_MS) * limit);
+  existing.last = now;
+  return existing;
+}
+
+/** Null when the request may proceed; otherwise which ceiling refused it. */
+type Denial = 'ip' | 'global' | null;
+
+function allow(ip: string): Denial {
   const now = Date.now();
 
-  // Cheap eviction so a long-lived instance cannot grow the map forever.
+  // Cheap eviction so a long-lived instance cannot grow the map forever. The
+  // global bucket is never evicted — dropping it would hand a scraper a fresh
+  // allowance every time the map filled up.
   if (buckets.size > 5000) {
     for (const [key, bucket] of buckets) {
-      if (now - bucket.last > RATE_WINDOW_MS * 5) buckets.delete(key);
+      if (key !== GLOBAL_KEY && now - bucket.last > RATE_WINDOW_MS * 5) buckets.delete(key);
     }
   }
 
-  const bucket = buckets.get(ip);
-  if (!bucket) {
-    buckets.set(ip, { tokens: RATE_LIMIT - 1, last: now });
-    return true;
-  }
+  const mine = refill(ip, RATE_LIMIT, now);
+  const everyone = refill(GLOBAL_KEY, GLOBAL_LIMIT, now);
 
-  const refill = ((now - bucket.last) / RATE_WINDOW_MS) * RATE_LIMIT;
-  bucket.tokens = Math.min(RATE_LIMIT, bucket.tokens + refill);
-  bucket.last = now;
+  if (mine.tokens < 1) return 'ip';
+  if (everyone.tokens < 1) return 'global';
 
-  if (bucket.tokens < 1) return false;
-  bucket.tokens -= 1;
-  return true;
+  // Charged only once both ceilings agree, so a request one bucket refuses is
+  // not silently billed against the other.
+  mine.tokens -= 1;
+  everyone.tokens -= 1;
+  return null;
 }
 
 /* ---------------------------------------------------------------- helpers -- */
@@ -126,6 +200,19 @@ function fallback(reason: FallbackReason, notice: string): Response {
 /** The only genuine errors: the request never described a usable recording. */
 function badRequest(error: string, notice: string): Response {
   return Response.json({ error, notice }, { status: 400 });
+}
+
+/**
+ * Refusal for an over-long take. Phrased in seconds first because that is the
+ * limit the app advertises and the one a person can act on; the megabytes are
+ * only how the server measures it.
+ */
+function tooLarge(): Response {
+  return badRequest(
+    'audio_too_large',
+    `That recording is longer than the ${MAX_SECONDS}-second limit for a single take ` +
+      `(over ${(MAX_AUDIO_BYTES / (1024 * 1024)).toFixed(1)} MB). Try a shorter take.`,
+  );
 }
 
 /**
@@ -169,6 +256,10 @@ function tidy(text: string): string {
  *
  * `live` is a boolean derived from the key. The key itself, its length and its
  * prefix all stay here.
+ *
+ * Both limits are reported because both are enforced: `maxSeconds` is what the
+ * client's recorder stops itself at, and `maxBytes` is how this route enforces
+ * the same bound on an upload it did not produce (see MAX_AUDIO_BYTES).
  */
 export async function GET(): Promise<Response> {
   return Response.json(
@@ -185,26 +276,33 @@ export async function GET(): Promise<Response> {
 /* ------------------------------------------------------------------- POST -- */
 
 export async function POST(req: Request): Promise<Response> {
-  if (!allow(clientIp(req))) {
+  const denied = allow(clientIp(req));
+  if (denied) {
     // Deliberately NOT a 429, unlike the terminal route. There is nothing for
     // the client to do differently on a retry that it cannot do right now in
     // demo mode, and a rate limit should degrade the feature rather than break
-    // the window.
+    // the window. The two ceilings get different sentences because "slow down"
+    // and "the site is busy" are different situations to be in.
     return fallback(
       'rate-limited',
-      'Too many transcriptions in the last minute. Demo mode still works — try live dictation again shortly.',
+      denied === 'ip'
+        ? 'Too many transcriptions from here in the last minute. Demo mode still works — try live dictation again shortly.'
+        : 'This demo is transcribing for a lot of people right now. Demo mode still works — try live dictation again shortly.',
     );
   }
 
   // Reject oversized uploads before formData() buffers them into this process.
   // The header is a claim, not a guarantee, which is why the parsed blob is
-  // measured again below.
+  // measured again below. (A chunked upload declares no length at all; the host
+  // platform's own body limit is what bounds that case, which is another reason
+  // MAX_AUDIO_BYTES is modest.)
+  //
+  // The allowance is for the multipart envelope — boundaries and part headers —
+  // so a recording that is exactly at the limit is not refused for the wrapper
+  // it arrived in. The exact test is on the parsed blob.
   const declared = Number(req.headers.get('content-length') ?? '');
-  if (Number.isFinite(declared) && declared > MAX_AUDIO_BYTES) {
-    return badRequest(
-      'audio_too_large',
-      `That recording is larger than the ${Math.round(MAX_AUDIO_BYTES / (1024 * 1024))} MB limit. Try a shorter take.`,
-    );
+  if (Number.isFinite(declared) && declared > MAX_AUDIO_BYTES + MULTIPART_OVERHEAD_BYTES) {
+    return tooLarge();
   }
 
   let form: FormData;
@@ -221,12 +319,7 @@ export async function POST(req: Request): Promise<Response> {
     return badRequest('missing_audio', 'No audio in that request.');
   }
 
-  if (entry.size > MAX_AUDIO_BYTES) {
-    return badRequest(
-      'audio_too_large',
-      `That recording is larger than the ${Math.round(MAX_AUDIO_BYTES / (1024 * 1024))} MB limit. Try a shorter take.`,
-    );
-  }
+  if (entry.size > MAX_AUDIO_BYTES) return tooLarge();
   if (entry.size < MIN_AUDIO_BYTES) {
     return badRequest(
       'audio_too_short',

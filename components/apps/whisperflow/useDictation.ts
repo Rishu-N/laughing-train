@@ -164,6 +164,14 @@ export function useDictation(
   const audioCtxRef = useRef<AudioContext | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const cancelledRef = useRef(false);
+  /**
+   * Which take is current. Incremented by everything that ends one, so the
+   * `await getUserMedia` in startLive can tell whether the take it is arming
+   * still exists by the time the permission prompt is answered. Without it, a
+   * Cancel — or a tab going hidden — during `arming` is followed seconds later
+   * by a microphone opening on a take nobody is watching.
+   */
+  const takeRef = useRef(0);
   const startedAtRef = useRef(0);
   const demoIndexRef = useRef(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -197,6 +205,9 @@ export function useDictation(
    */
   const releaseCapture = useCallback(() => {
     clearTimers();
+    // Abandons any take still waiting on the permission prompt, so a stream that
+    // arrives after this point is stopped rather than started.
+    takeRef.current += 1;
     setLevels(EMPTY_LEVELS);
     if (streamRef.current) {
       for (const track of streamRef.current.getTracks()) track.stop();
@@ -443,6 +454,10 @@ export function useDictation(
     // is deliberately not reset here — that request is already in flight and
     // owns the ending.
     clearTimers();
+    // Covers the `arming` case: the prompt is still up, so there is no recorder
+    // to stop, and this is what makes the answer — whenever it comes — land on a
+    // take that no longer exists.
+    takeRef.current += 1;
     if (phase === 'recording' || phase === 'typing' || phase === 'arming') setPhase('idle');
   }, [clearTimers, phase]);
 
@@ -461,6 +476,8 @@ export function useDictation(
     setPending('');
     setPhase('arming');
 
+    const take = (takeRef.current += 1);
+
     let stream: MediaStream;
     try {
       // Plain `audio: true`. Nothing is asked of the browser's own processing —
@@ -473,6 +490,16 @@ export function useDictation(
     }
 
     setMic('granted');
+
+    // The prompt can sit there for as long as it likes, and in that time the
+    // take may have been cancelled, switched to demo mode, or ended by the tab
+    // going to the background. Answering "allow" afterwards must not open a
+    // microphone nobody asked for any more, so the stream is stopped on arrival.
+    if (takeRef.current !== take || document.visibilityState === 'hidden') {
+      for (const track of stream.getTracks()) track.stop();
+      setPhase((current) => (current === 'arming' ? 'idle' : current));
+      return;
+    }
     streamRef.current = stream;
     chunksRef.current = [];
     cancelledRef.current = false;
